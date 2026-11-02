@@ -6,13 +6,19 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.managesoundmode.app.ManageSoundApplication
+import com.managesoundmode.app.data.local.PersistedSoundPrefs
 import com.managesoundmode.app.data.repository.SoundModeRepository
 import com.managesoundmode.app.domain.model.DeviceSoundSnapshot
+import com.managesoundmode.app.domain.model.LocationRule
+import com.managesoundmode.app.domain.model.RestorePolicy
+import com.managesoundmode.app.domain.model.ScheduleRule
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.domain.model.TimedModeSession
+import com.managesoundmode.app.domain.model.TransitionLogEntry
 import com.managesoundmode.app.domain.model.VolumeStreamType
 import com.managesoundmode.app.domain.model.VolumeStreams
+import com.managesoundmode.app.domain.model.Weekday
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +38,21 @@ sealed interface MainScreenUiState {
     val activeProfileId: String? = null,
     val activeTimer: TimedModeSession? = null,
     val statusMessage: String? = null,
+    val canScheduleExactAlarms: Boolean = true,
+    val hasLocationPermission: Boolean = false,
+    val hasBackgroundLocationPermission: Boolean = false,
+    val isMusicActive: Boolean = false,
+    val isBluetoothHeadsetConnected: Boolean = false,
+    val activeRuleTitle: String? = null,
+    val activeRuleSubtitle: String? = null,
+    val isManuallyOverridden: Boolean = false,
+    val scheduleRules: List<ScheduleRule> = emptyList(),
+    val locationRules: List<LocationRule> = emptyList(),
+    val restorePolicy: RestorePolicy = RestorePolicy.DEFAULT_PROFILE,
+    val defaultDayProfileId: String = SoundProfile.DEFAULT_DAY_PROFILE_ID,
+    val transitionLogs: List<TransitionLogEntry> = emptyList(),
+    val useDynamicColor: Boolean = true,
+    val hasAcceptedLocationDisclosure: Boolean = false,
   ) : MainScreenUiState
 
   data class Error(val message: String) : MainScreenUiState
@@ -46,8 +67,9 @@ class MainScreenViewModel(
   val uiState: StateFlow<MainScreenUiState> = combine(
     repository.snapshotStream,
     repository.profilesStream,
+    repository.preferencesStream,
     feedbackMessage,
-  ) { snapshot: DeviceSoundSnapshot, profiles: List<SoundProfile>, message: String? ->
+  ) { snapshot: DeviceSoundSnapshot, profiles: List<SoundProfile>, prefs: PersistedSoundPrefs, message: String? ->
     MainScreenUiState.Ready(
       currentMode = snapshot.currentMode,
       streams = snapshot.streams,
@@ -56,6 +78,21 @@ class MainScreenViewModel(
       activeProfileId = snapshot.activeProfileId,
       activeTimer = snapshot.activeTimer,
       statusMessage = message,
+      canScheduleExactAlarms = snapshot.canScheduleExactAlarms,
+      hasLocationPermission = snapshot.hasLocationPermission,
+      hasBackgroundLocationPermission = snapshot.hasBackgroundLocationPermission,
+      isMusicActive = snapshot.isMusicActive,
+      isBluetoothHeadsetConnected = snapshot.isBluetoothHeadsetConnected,
+      activeRuleTitle = snapshot.activeRuleTitle,
+      activeRuleSubtitle = snapshot.activeRuleSubtitle,
+      isManuallyOverridden = snapshot.isManuallyOverridden,
+      scheduleRules = prefs.scheduleRules,
+      locationRules = prefs.locationRules,
+      restorePolicy = prefs.restorePolicy,
+      defaultDayProfileId = prefs.defaultDayProfileId,
+      transitionLogs = prefs.transitionLogs,
+      useDynamicColor = prefs.useDynamicColor,
+      hasAcceptedLocationDisclosure = prefs.hasAcceptedLocationDisclosure,
     ) as MainScreenUiState
   }
     .catch { throwable ->
@@ -69,6 +106,9 @@ class MainScreenViewModel(
 
   fun onRefreshSystemState() {
     repository.refreshSystemState()
+    viewModelScope.launch {
+      repository.evaluateAndApplyRules()
+    }
   }
 
   fun onSelectMode(mode: SoundMode) {
@@ -137,6 +177,151 @@ class MainScreenViewModel(
         .onFailure { error ->
           feedbackMessage.value = error.message ?: "Falha ao salvar perfil"
         }
+    }
+  }
+
+  fun onDeleteCustomProfile(profileId: String) {
+    viewModelScope.launch {
+      repository.deleteCustomProfile(profileId)
+        .onSuccess {
+          feedbackMessage.value = "Perfil removido"
+        }
+    }
+  }
+
+  fun onUpsertScheduleRule(rule: ScheduleRule) {
+    viewModelScope.launch {
+      repository.upsertScheduleRule(rule)
+        .onSuccess {
+          feedbackMessage.value = "Horário '${rule.name}' (${rule.formattedWindow()}) salvo"
+        }
+        .onFailure { error ->
+          feedbackMessage.value = error.message ?: "Erro ao salvar horário"
+        }
+    }
+  }
+
+  fun onToggleScheduleRule(rule: ScheduleRule, enabled: Boolean) {
+    viewModelScope.launch {
+      repository.upsertScheduleRule(rule.copy(enabled = enabled))
+        .onSuccess {
+          val stateLabel = if (enabled) "ativado" else "desativado"
+          feedbackMessage.value = "Horário '${rule.name}' $stateLabel"
+        }
+    }
+  }
+
+  fun onToggleScheduleRuleWeekday(rule: ScheduleRule, weekday: Weekday) {
+    val updatedDays = if (weekday in rule.daysOfWeek) {
+      if (rule.daysOfWeek.size > 1) rule.daysOfWeek - weekday else rule.daysOfWeek
+    } else {
+      rule.daysOfWeek + weekday
+    }
+    viewModelScope.launch {
+      repository.upsertScheduleRule(rule.copy(daysOfWeek = updatedDays))
+    }
+  }
+
+  fun onUpdateScheduleRuleProfile(rule: ScheduleRule, profileId: String) {
+    viewModelScope.launch {
+      repository.upsertScheduleRule(rule.copy(targetProfileId = profileId))
+    }
+  }
+
+  fun onToggleScheduleRuleHighPriority(rule: ScheduleRule, highPriority: Boolean) {
+    viewModelScope.launch {
+      repository.upsertScheduleRule(rule.copy(highPriority = highPriority))
+    }
+  }
+
+  fun onDeleteScheduleRule(ruleId: String) {
+    viewModelScope.launch {
+      repository.deleteScheduleRule(ruleId)
+        .onSuccess {
+          feedbackMessage.value = "Horário removido"
+        }
+    }
+  }
+
+  fun onUpsertLocationRule(rule: LocationRule) {
+    viewModelScope.launch {
+      repository.upsertLocationRule(rule)
+        .onSuccess {
+          feedbackMessage.value = "Local '${rule.name}' salvo"
+        }
+    }
+  }
+
+  fun onToggleLocationRule(rule: LocationRule, enabled: Boolean) {
+    viewModelScope.launch {
+      repository.upsertLocationRule(rule.copy(enabled = enabled))
+    }
+  }
+
+  fun onToggleLocationPresence(ruleId: String, inside: Boolean) {
+    viewModelScope.launch {
+      repository.toggleLocationPresence(ruleId, inside)
+        .onSuccess {
+          feedbackMessage.value = if (inside) {
+            "Entrada no perímetro detectada • Regra avaliada"
+          } else {
+            "Saída do perímetro detectada • Modo reavaliado"
+          }
+        }
+    }
+  }
+
+  fun onDeleteLocationRule(ruleId: String) {
+    viewModelScope.launch {
+      repository.deleteLocationRule(ruleId)
+        .onSuccess {
+          feedbackMessage.value = "Local removido"
+        }
+    }
+  }
+
+  fun onSetRestorePolicy(policy: RestorePolicy) {
+    viewModelScope.launch {
+      repository.setRestorePolicy(policy)
+        .onSuccess {
+          feedbackMessage.value = "Política de restauração: ${policy.title}"
+        }
+    }
+  }
+
+  fun onSetDefaultDayProfileId(profileId: String) {
+    viewModelScope.launch {
+      repository.setDefaultDayProfileId(profileId)
+    }
+  }
+
+  fun onSetUseDynamicColor(enabled: Boolean) {
+    viewModelScope.launch {
+      repository.setUseDynamicColor(enabled)
+    }
+  }
+
+  fun onAcceptLocationDisclosure() {
+    viewModelScope.launch {
+      repository.setLocationDisclosureAccepted(true)
+    }
+  }
+
+  fun onReapplyActiveRule() {
+    viewModelScope.launch {
+      repository.reapplyActiveRule()
+        .onSuccess {
+          feedbackMessage.value = "Regra ativa reaplicada com sucesso"
+        }
+        .onFailure { error ->
+          feedbackMessage.value = error.message ?: "Falha ao reaplicar regra"
+        }
+    }
+  }
+
+  fun onClearTransitionLogs() {
+    viewModelScope.launch {
+      repository.clearTransitionLogs()
     }
   }
 

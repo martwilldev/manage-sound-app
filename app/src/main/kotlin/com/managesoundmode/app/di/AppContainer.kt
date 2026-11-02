@@ -7,6 +7,7 @@ import com.managesoundmode.app.data.repository.DefaultSoundModeRepository
 import com.managesoundmode.app.data.repository.SoundModeRepository
 import com.managesoundmode.app.data.system.AndroidSoundSystemController
 import com.managesoundmode.app.data.system.SoundSystemController
+import com.managesoundmode.app.system.ExactRuleAlarmScheduler
 import com.managesoundmode.app.work.RestoreSoundModeWorker
 
 interface AppContainer {
@@ -33,6 +34,9 @@ class DefaultAppContainer(
       preferencesDataSource = preferencesDataSource,
       onScheduleAutoRestore = { minutes -> RestoreSoundModeWorker.schedule(appContext, minutes) },
       onCancelAutoRestore = { RestoreSoundModeWorker.cancel(appContext) },
+      onRescheduleRuleAlarms = { rules ->
+        ExactRuleAlarmScheduler.scheduleNextTransition(appContext, rules)
+      },
     )
   }
 }
