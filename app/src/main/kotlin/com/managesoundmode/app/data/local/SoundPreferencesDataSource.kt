@@ -14,6 +14,7 @@ import com.managesoundmode.app.domain.model.RestorePolicy
 import com.managesoundmode.app.domain.model.SavedStateSnapshot
 import com.managesoundmode.app.domain.model.ScheduleRule
 import com.managesoundmode.app.domain.model.SoundProfile
+import com.managesoundmode.app.domain.model.ThemeMode
 import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.TransitionLogEntry
 import java.io.IOException
@@ -40,6 +41,7 @@ data class PersistedSoundPrefs(
   val overriddenSessionKey: String? = null,
   val transitionLogs: List<TransitionLogEntry> = emptyList(),
   val useDynamicColor: Boolean = true,
+  val themeMode: ThemeMode = ThemeMode.DARK,
   val hasAcceptedLocationDisclosure: Boolean = false,
 )
 
@@ -61,6 +63,7 @@ interface SoundPreferencesDataSource {
   suspend fun appendTransitionLog(entry: TransitionLogEntry) {}
   suspend fun clearTransitionLogs() {}
   suspend fun setUseDynamicColor(enabled: Boolean) {}
+  suspend fun setThemeMode(mode: ThemeMode) {}
   suspend fun setLocationDisclosureAccepted(accepted: Boolean) {}
 }
 
@@ -120,6 +123,10 @@ class DataStoreSoundPreferencesDataSource(
             .getOrDefault(emptyList())
         } ?: emptyList()
 
+        val themeMode = prefs[KEY_THEME_MODE]?.let { raw ->
+          runCatching { ThemeMode.valueOf(raw) }.getOrDefault(ThemeMode.DARK)
+        } ?: ThemeMode.DARK
+
         PersistedSoundPrefs(
           activeProfileId = activeProfileId,
           activeTimer = activeTimer,
@@ -133,6 +140,7 @@ class DataStoreSoundPreferencesDataSource(
           overriddenSessionKey = prefs[KEY_OVERRIDDEN_SESSION_KEY],
           transitionLogs = transitionLogs,
           useDynamicColor = prefs[KEY_USE_DYNAMIC_COLOR] ?: true,
+          themeMode = themeMode,
           hasAcceptedLocationDisclosure = prefs[KEY_LOCATION_DISCLOSURE_ACCEPTED] ?: false,
         )
       }
@@ -295,6 +303,12 @@ class DataStoreSoundPreferencesDataSource(
     }
   }
 
+  override suspend fun setThemeMode(mode: ThemeMode) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_THEME_MODE] = mode.name
+    }
+  }
+
   override suspend fun setLocationDisclosureAccepted(accepted: Boolean) {
     context.soundDataStore.edit { prefs ->
       prefs[KEY_LOCATION_DISCLOSURE_ACCEPTED] = accepted
@@ -316,6 +330,7 @@ class DataStoreSoundPreferencesDataSource(
     val KEY_OVERRIDDEN_SESSION_KEY = stringPreferencesKey("overridden_session_key")
     val KEY_TRANSITION_LOGS_JSON = stringPreferencesKey("transition_logs_json")
     val KEY_USE_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
+    val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     val KEY_LOCATION_DISCLOSURE_ACCEPTED = booleanPreferencesKey("location_disclosure_accepted")
   }
 }

@@ -1,9 +1,10 @@
 package com.managesoundmode.app.ui.theme
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.managesoundmode.app.domain.model.SoundMode
 
-// Semantic tokens from docs/DESIGN_SYSTEM.md
 val SoundNormalEmerald = Color(0xFF10B981)
 val SoundNormalContainerDark = Color(0xFF064E3B)
 
@@ -17,20 +18,29 @@ val SoundSilentContainerDark = Color(0xFF312E81)
 val SoundTimerBlue = Color(0xFF3B82F6)
 val SoundTimerContainerDark = Color(0xFF1E3A8A)
 
-// Dark-First Surface Palette
-val BackgroundDark = Color(0xFF0B0F17)
-val SurfaceDark = Color(0xFF111827)
-val SurfaceContainerDark = Color(0xFF1F2937)
-val SurfaceVariantDark = Color(0xFF374151)
-val OnSurfaceDark = Color(0xFFF9FAFB)
-val OnSurfaceMutedDark = Color(0xFF9CA3AF)
+/**
+ * Papéis tonais 100% integrados ao Material 3 / Material You (Monet) — tanto em Dark quanto em Light Mode!
+ */
+@Composable
+fun SoundMode.tonalContainerColor(): Color = when (this) {
+  SoundMode.NORMAL -> MaterialTheme.colorScheme.primaryContainer
+  SoundMode.VIBRATE -> MaterialTheme.colorScheme.tertiaryContainer
+  SoundMode.SILENT -> MaterialTheme.colorScheme.secondaryContainer
+}
 
-// Light Surface Palette
-val BackgroundLight = Color(0xFFF8FAFC)
-val SurfaceLight = Color(0xFFFFFFFF)
-val SurfaceContainerLight = Color(0xFFF1F5F9)
-val OnSurfaceLight = Color(0xFF0F172A)
-val OnSurfaceMutedLight = Color(0xFF475569)
+@Composable
+fun SoundMode.onTonalContainerColor(): Color = when (this) {
+  SoundMode.NORMAL -> MaterialTheme.colorScheme.onPrimaryContainer
+  SoundMode.VIBRATE -> MaterialTheme.colorScheme.onTertiaryContainer
+  SoundMode.SILENT -> MaterialTheme.colorScheme.onSecondaryContainer
+}
+
+@Composable
+fun SoundMode.tonalAccentColor(): Color = when (this) {
+  SoundMode.NORMAL -> MaterialTheme.colorScheme.primary
+  SoundMode.VIBRATE -> MaterialTheme.colorScheme.tertiary
+  SoundMode.SILENT -> MaterialTheme.colorScheme.secondary
+}
 
 fun SoundMode.accentColor(): Color = when (this) {
   SoundMode.NORMAL -> SoundNormalEmerald

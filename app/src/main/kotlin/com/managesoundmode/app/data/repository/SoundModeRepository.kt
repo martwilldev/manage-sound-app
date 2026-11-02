@@ -12,6 +12,7 @@ import com.managesoundmode.app.domain.model.SavedStateSnapshot
 import com.managesoundmode.app.domain.model.ScheduleRule
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.SoundProfile
+import com.managesoundmode.app.domain.model.ThemeMode
 import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.TransitionLogEntry
 import com.managesoundmode.app.domain.model.TransitionTriggerSource
@@ -46,6 +47,7 @@ interface SoundModeRepository {
   ): Result<TimedModeSession>
   suspend fun cancelOrRestoreTimedSession(): Result<Unit>
   suspend fun saveCurrentAsProfile(name: String, description: String): Result<SoundProfile>
+  suspend fun upsertProfile(profile: SoundProfile, applyImmediately: Boolean = false): Result<SoundProfile>
   suspend fun deleteCustomProfile(profileId: String): Result<Unit>
 
   suspend fun upsertScheduleRule(rule: ScheduleRule): Result<Unit>
@@ -57,6 +59,7 @@ interface SoundModeRepository {
   suspend fun setRestorePolicy(policy: RestorePolicy): Result<Unit>
   suspend fun setDefaultDayProfileId(profileId: String): Result<Unit>
   suspend fun setUseDynamicColor(enabled: Boolean): Result<Unit>
+  suspend fun setThemeMode(mode: ThemeMode): Result<Unit>
   suspend fun setLocationDisclosureAccepted(accepted: Boolean): Result<Unit>
   suspend fun clearTransitionLogs(): Result<Unit>
 
@@ -83,7 +86,7 @@ class DefaultSoundModeRepository(
 
   override val profilesStream: Flow<List<SoundProfile>> =
     preferencesDataSource.prefsFlow.combine(manualRefreshTrigger) { prefs, _ ->
-      SoundProfile.defaultPresets + prefs.customProfiles
+      mergeProfiles(prefs.customProfiles)
     }
 
   override val snapshotStream: Flow<DeviceSoundSnapshot> = combine(
@@ -96,7 +99,7 @@ class DefaultSoundModeRepository(
       Instant.ofEpochMilli(nowMillis),
       ZoneId.systemDefault(),
     )
-    val allProfiles = SoundProfile.defaultPresets + prefs.customProfiles
+    val allProfiles = mergeProfiles(prefs.customProfiles)
 
     val decision = RuleEvaluator.evaluate(
       nowDateTime = nowDateTime,
@@ -273,6 +276,26 @@ class DefaultSoundModeRepository(
     profile
   }
 
+  override suspend fun upsertProfile(
+    profile: SoundProfile,
+    applyImmediately: Boolean,
+  ): Result<SoundProfile> = runCatching {
+    val trimmedName = profile.name.trim()
+    require(trimmedName.isNotEmpty()) { "O nome do perfil não pode ser vazio" }
+    val normalized = profile.copy(
+      name = trimmedName,
+      description = profile.description.trim().ifEmpty { profile.summaryLabel() },
+    )
+    preferencesDataSource.upsertCustomProfile(normalized)
+    if (applyImmediately) {
+      activateProfile(normalized, source = TransitionTriggerSource.MANUAL).getOrThrow()
+    } else {
+      evaluateAndApplyRules(source = TransitionTriggerSource.MANUAL)
+      refreshSystemState()
+    }
+    normalized
+  }
+
   override suspend fun deleteCustomProfile(profileId: String): Result<Unit> = runCatching {
     preferencesDataSource.deleteCustomProfile(profileId)
     refreshSystemState()
@@ -330,6 +353,11 @@ class DefaultSoundModeRepository(
     refreshSystemState()
   }
 
+  override suspend fun setThemeMode(mode: ThemeMode): Result<Unit> = runCatching {
+    preferencesDataSource.setThemeMode(mode)
+    refreshSystemState()
+  }
+
   override suspend fun setLocationDisclosureAccepted(accepted: Boolean): Result<Unit> = runCatching {
     preferencesDataSource.setLocationDisclosureAccepted(accepted)
     refreshSystemState()
@@ -353,7 +381,7 @@ class DefaultSoundModeRepository(
     nowEpochMillis: Long,
   ): Result<RuleEvaluationDecision> = runCatching {
     val prefs = preferencesDataSource.prefsFlow.first()
-    val allProfiles = SoundProfile.defaultPresets + prefs.customProfiles
+    val allProfiles = mergeProfiles(prefs.customProfiles)
     val nowDateTime = LocalDateTime.ofInstant(
       Instant.ofEpochMilli(nowEpochMillis),
       ZoneId.systemDefault(),
@@ -498,7 +526,7 @@ class DefaultSoundModeRepository(
       Instant.ofEpochMilli(nowMillis),
       ZoneId.systemDefault(),
     )
-    val allProfiles = SoundProfile.defaultPresets + prefs.customProfiles
+    val allProfiles = mergeProfiles(prefs.customProfiles)
     val decision = RuleEvaluator.evaluate(
       nowDateTime = nowDateTime,
       nowEpochMillis = nowMillis,
@@ -534,6 +562,16 @@ class DefaultSoundModeRepository(
         appliedMode = mode,
       ),
     )
+  }
+
+  private fun mergeProfiles(savedProfiles: List<SoundProfile>): List<SoundProfile> {
+    val savedById = savedProfiles.associateBy { it.id }
+    val presetIds = SoundProfile.defaultPresets.map { it.id }.toSet()
+    val resolvedPresets = SoundProfile.defaultPresets.map { preset ->
+      savedById[preset.id]?.copy(isPreset = true) ?: preset
+    }
+    val extraCustom = savedProfiles.filterNot { it.id in presetIds }
+    return resolvedPresets + extraCustom
   }
 
   private data class Quadruple<A, B, C, D>(

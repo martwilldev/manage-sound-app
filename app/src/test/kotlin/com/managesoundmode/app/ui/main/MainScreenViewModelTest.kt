@@ -11,6 +11,7 @@ import com.managesoundmode.app.domain.model.SavedStateSnapshot
 import com.managesoundmode.app.domain.model.ScheduleRule
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.SoundProfile
+import com.managesoundmode.app.domain.model.ThemeMode
 import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.TransitionLogEntry
 import com.managesoundmode.app.domain.model.VolumeStreamType
@@ -161,6 +162,29 @@ class MainScreenViewModelTest {
     val ready = viewModel.uiState.value as MainScreenUiState.Ready
     assertEquals(RestorePolicy.SNAPSHOT, ready.restorePolicy)
   }
+
+  @Test
+  fun onSetThemeMode_andUpsertProfile_updatesThemeAndEditsPresetProfile() = runTest {
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    viewModel.onSetThemeMode(ThemeMode.LIGHT)
+    val afterTheme = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(ThemeMode.LIGHT, afterTheme.themeMode)
+
+    val workPreset = afterTheme.profiles.first { it.id == "preset_work_high" }
+    val editedWork = workPreset.copy(
+      streams = workPreset.streams.copy(ringPercent = 75, mediaPercent = 15),
+    )
+    viewModel.onUpsertProfile(editedWork, applyImmediately = true)
+
+    val afterEdit = viewModel.uiState.value as MainScreenUiState.Ready
+    val updatedPreset = afterEdit.profiles.first { it.id == "preset_work_high" }
+    assertEquals(75, updatedPreset.streams.ringPercent)
+    assertEquals(15, updatedPreset.streams.mediaPercent)
+    assertEquals("preset_work_high", afterEdit.activeProfileId)
+  }
 }
 
 private class FakeSoundSystemController : SoundSystemController {
@@ -279,6 +303,10 @@ private class FakeSoundPreferencesDataSource : SoundPreferencesDataSource {
 
   override suspend fun setUseDynamicColor(enabled: Boolean) {
     state.value = state.value.copy(useDynamicColor = enabled)
+  }
+
+  override suspend fun setThemeMode(mode: ThemeMode) {
+    state.value = state.value.copy(themeMode = mode)
   }
 
   override suspend fun setLocationDisclosureAccepted(accepted: Boolean) {

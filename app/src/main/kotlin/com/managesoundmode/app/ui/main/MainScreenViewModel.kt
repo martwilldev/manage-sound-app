@@ -14,6 +14,7 @@ import com.managesoundmode.app.domain.model.RestorePolicy
 import com.managesoundmode.app.domain.model.ScheduleRule
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.SoundProfile
+import com.managesoundmode.app.domain.model.ThemeMode
 import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.TransitionLogEntry
 import com.managesoundmode.app.domain.model.VolumeStreamType
@@ -52,6 +53,7 @@ sealed interface MainScreenUiState {
     val defaultDayProfileId: String = SoundProfile.DEFAULT_DAY_PROFILE_ID,
     val transitionLogs: List<TransitionLogEntry> = emptyList(),
     val useDynamicColor: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.DARK,
     val hasAcceptedLocationDisclosure: Boolean = false,
   ) : MainScreenUiState
 
@@ -92,6 +94,7 @@ class MainScreenViewModel(
       defaultDayProfileId = prefs.defaultDayProfileId,
       transitionLogs = prefs.transitionLogs,
       useDynamicColor = prefs.useDynamicColor,
+      themeMode = prefs.themeMode,
       hasAcceptedLocationDisclosure = prefs.hasAcceptedLocationDisclosure,
     ) as MainScreenUiState
   }
@@ -173,6 +176,22 @@ class MainScreenViewModel(
       repository.saveCurrentAsProfile(name, description)
         .onSuccess { profile ->
           feedbackMessage.value = "Perfil '${profile.name}' salvo com sucesso"
+        }
+        .onFailure { error ->
+          feedbackMessage.value = error.message ?: "Falha ao salvar perfil"
+        }
+    }
+  }
+
+  fun onUpsertProfile(profile: SoundProfile, applyImmediately: Boolean) {
+    viewModelScope.launch {
+      repository.upsertProfile(profile, applyImmediately = applyImmediately)
+        .onSuccess { saved ->
+          feedbackMessage.value = if (applyImmediately) {
+            "Perfil '${saved.name}' salvo e ativado"
+          } else {
+            "Perfil '${saved.name}' atualizado"
+          }
         }
         .onFailure { error ->
           feedbackMessage.value = error.message ?: "Falha ao salvar perfil"
@@ -263,9 +282,9 @@ class MainScreenViewModel(
       repository.toggleLocationPresence(ruleId, inside)
         .onSuccess {
           feedbackMessage.value = if (inside) {
-            "Entrada no perímetro detectada • Regra avaliada"
+            "Presença no local simulada • Regra avaliada"
           } else {
-            "Saída do perímetro detectada • Modo reavaliado"
+            "Saída do local simulada • Modo reavaliado"
           }
         }
     }
@@ -298,6 +317,12 @@ class MainScreenViewModel(
   fun onSetUseDynamicColor(enabled: Boolean) {
     viewModelScope.launch {
       repository.setUseDynamicColor(enabled)
+    }
+  }
+
+  fun onSetThemeMode(mode: ThemeMode) {
+    viewModelScope.launch {
+      repository.setThemeMode(mode)
     }
   }
 

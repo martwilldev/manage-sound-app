@@ -145,6 +145,15 @@ data class LocationRule(
 }
 
 @Serializable
+enum class ThemeMode(
+  val label: String,
+) {
+  SYSTEM("Sistema"),
+  LIGHT("Claro"),
+  DARK("Escuro"),
+}
+
+@Serializable
 enum class RestorePolicy(
   val title: String,
   val subtitle: String,
