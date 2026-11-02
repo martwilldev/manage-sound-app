@@ -1,9 +1,7 @@
 package com.managesoundmode.app.ui.main
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,29 +11,28 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.MusicOff
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.SettingsBrightness
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -51,14 +48,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.managesoundmode.app.domain.model.RestorePolicy
-import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.domain.model.ThemeMode
 import com.managesoundmode.app.domain.model.TransitionLogEntry
 import com.managesoundmode.app.ui.components.M3CheckSwitch
 import com.managesoundmode.app.ui.components.groupedCardShape
-import com.managesoundmode.app.ui.components.profileIconForKey
-import com.managesoundmode.app.ui.theme.onTonalContainerColor
-import com.managesoundmode.app.ui.theme.tonalContainerColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,14 +60,17 @@ import java.util.Locale
 @Composable
 internal fun SettingsAndProfilesTabContent(
   state: MainScreenUiState.Ready,
-  onActivateProfile: (SoundProfile) -> Unit,
-  onEditProfile: (SoundProfile) -> Unit,
-  onCreateNewProfile: () -> Unit,
   onSetRestorePolicy: (RestorePolicy) -> Unit,
   onSetThemeMode: (ThemeMode) -> Unit,
   onSetUseDynamicColor: (Boolean) -> Unit,
+  onSetMuteMediaOnSilent: (Boolean) -> Unit,
+  onSetPreserveMediaOnBluetooth: (Boolean) -> Unit,
+  onSetSmartVolumeTriggerEnabled: (Boolean) -> Unit,
+  onTestSmartNotification: () -> Unit,
+  onPinHomeWidget: () -> Unit,
   onRequestDndPermission: () -> Unit,
   onRequestExactAlarmPermission: () -> Unit,
+  onRequestNotificationPermission: () -> Unit,
   onClearLogs: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -84,7 +80,7 @@ internal fun SettingsAndProfilesTabContent(
     modifier = modifier
       .fillMaxSize()
       .testTag("settings_tab_list"),
-    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 36.dp),
+    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 36.dp),
     verticalArrangement = Arrangement.spacedBy(3.dp),
   ) {
     // 1. Aparência & Tema (Modo Claro, Modo Escuro, Sistema + Monet)
@@ -189,58 +185,86 @@ internal fun SettingsAndProfilesTabContent(
       }
     }
 
-    // 2. Gestão de Perfis de Som
+    // 2. Gatilho de Botão de Volume, Notificações & Inteligência de Mídia
     item {
       Spacer(modifier = Modifier.height(14.dp))
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(bottom = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+      SectionHeader(title = "Botões de Volume, Notificações & Mídia")
+    }
+
+    item {
+      val shape = groupedCardShape(index = 0, totalCount = 3)
+      Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
       ) {
-        Text(
-          text = "Perfis de Som",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold,
-        )
-        FilledTonalButton(onClick = onCreateNewProfile) {
-          Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-          )
-          Spacer(modifier = Modifier.width(6.dp))
-          Text("Novo Perfil")
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(18.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Row(
+              modifier = Modifier.weight(1f),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+              Icon(
+                imageVector = Icons.Default.NotificationsActive,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+              )
+              Column {
+                Text(
+                  text = "Sugerir Timer ao Silenciar",
+                  style = MaterialTheme.typography.titleMedium,
+                  fontWeight = FontWeight.Medium,
+                )
+                Text(
+                  text = "Exibe notificação com [30m] [1h] [2h] quando você silencia pelo botão físico",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+              }
+            }
+            M3CheckSwitch(
+              checked = state.smartVolumeTriggerEnabled,
+              onCheckedChange = onSetSmartVolumeTriggerEnabled,
+            )
+          }
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+          ) {
+            TextButton(onClick = onTestSmartNotification) {
+              Text("Testar notificação inteligente")
+            }
+          }
         }
       }
     }
 
-    itemsIndexed(
-      items = state.profiles,
-      key = { _, profile -> "settings_${profile.id}" },
-    ) { index, profile ->
-      val isActive = state.activeProfileId == profile.id
-      val shape = groupedCardShape(index = index, totalCount = state.profiles.size)
-
+    item {
+      val shape = groupedCardShape(index = 1, totalCount = 3)
       Card(
-        modifier = Modifier
-          .fillMaxWidth()
-          .clip(shape)
-          .clickable { onActivateProfile(profile) },
+        modifier = Modifier.fillMaxWidth(),
         shape = shape,
         colors = CardDefaults.cardColors(
-          containerColor = if (isActive) {
-            MaterialTheme.colorScheme.secondaryContainer
-          } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
-          },
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
       ) {
         Row(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 14.dp),
+            .padding(18.dp),
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -249,64 +273,133 @@ internal fun SettingsAndProfilesTabContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
           ) {
-            Box(
-              modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(profile.mode.tonalContainerColor()),
-              contentAlignment = Alignment.Center,
-            ) {
-              Icon(
-                imageVector = profileIconForKey(profile.iconKey),
-                contentDescription = null,
-                tint = profile.mode.onTonalContainerColor(),
-                modifier = Modifier.size(20.dp),
-              )
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-              ) {
-                Text(
-                  text = profile.name,
-                  style = MaterialTheme.typography.titleMedium,
-                  fontWeight = FontWeight.SemiBold,
-                )
-                if (isActive) {
-                  Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.primary,
-                  ) {
-                    Text(
-                      text = "Ativo",
-                      style = MaterialTheme.typography.labelSmall,
-                      color = MaterialTheme.colorScheme.onPrimary,
-                      modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                  }
-                }
-              }
+            Icon(
+              imageVector = Icons.Default.MusicOff,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
+            )
+            Column {
               Text(
-                text = "${profile.mode.title} • ${profile.summaryLabel()}",
+                text = "Zerar Mídia ao Silenciar",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+              )
+              Text(
+                text = "Zera vídeos/jogos ao entrar em Vibrar ou Silencioso e devolve ao voltar",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
             }
           }
+          M3CheckSwitch(
+            checked = state.muteMediaOnSilent,
+            onCheckedChange = onSetMuteMediaOnSilent,
+          )
+        }
+      }
+    }
 
-          IconButton(onClick = { onEditProfile(profile) }) {
+    item {
+      val shape = groupedCardShape(index = 2, totalCount = 3)
+      Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+      ) {
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(18.dp),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
             Icon(
-              imageVector = Icons.Default.Edit,
-              contentDescription = "Editar perfil ${profile.name}",
-              tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              imageVector = Icons.Default.BluetoothAudio,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
             )
+            Column {
+              Text(
+                text = "Preservar Mídia no Bluetooth",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+              )
+              Text(
+                text = "Mantém o volume do fone ou som automotivo conectado",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+          M3CheckSwitch(
+            checked = state.preserveMediaOnBluetooth,
+            onCheckedChange = onSetPreserveMediaOnBluetooth,
+          )
+        }
+      }
+    }
+
+    // 3. Widgets & Gadgets do Sistema
+    item {
+      Spacer(modifier = Modifier.height(14.dp))
+      SectionHeader(title = "Widgets & Gadgets do Sistema")
+    }
+
+    item {
+      Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(18.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Icon(
+              imageVector = Icons.Default.Widgets,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "Widget Material You (2x1, 4x1 e 4x2)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+              )
+              Text(
+                text = "Troque entre Som, Vibrar, Silêncio e Perfis em 1 toque direto na tela inicial ou segure o ícone do app para ver os 4 atalhos rápidos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+          FilledTonalButton(
+            onClick = onPinHomeWidget,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.align(Alignment.End),
+          ) {
+            Text("Fixar Widget na Tela Inicial")
           }
         }
       }
     }
 
-    // 3. Comportamento ao Finalizar Período (RestorePolicy)
+    // 4. Comportamento ao Finalizar Período (RestorePolicy)
     item {
       Spacer(modifier = Modifier.height(14.dp))
       SectionHeader(title = "Ao Encerrar um Período")
@@ -369,7 +462,7 @@ internal fun SettingsAndProfilesTabContent(
       }
     }
 
-    // 4. Status do Sistema (Health Check)
+    // 5. Status do Sistema (Health Check)
     item {
       Spacer(modifier = Modifier.height(14.dp))
       SectionHeader(title = "Permissões do Sistema")
@@ -380,8 +473,22 @@ internal fun SettingsAndProfilesTabContent(
         title = "Acesso ao Não Perturbe (DND)",
         subtitle = if (state.hasDndPermission) "Concedido" else "Pendente • Toque para autorizar",
         isHealthy = state.hasDndPermission,
-        shape = groupedCardShape(index = 0, totalCount = 3),
+        shape = groupedCardShape(index = 0, totalCount = 4),
         onClick = onRequestDndPermission,
+      )
+    }
+
+    item {
+      HealthCheckItemCard(
+        title = "Notificações Inteligentes",
+        subtitle = if (state.hasNotificationPermission) {
+          "Concedido • Timer e sugestões ativos"
+        } else {
+          "Pendente • Toque para permitir notificações"
+        },
+        isHealthy = state.hasNotificationPermission,
+        shape = groupedCardShape(index = 1, totalCount = 4),
+        onClick = onRequestNotificationPermission,
       )
     }
 
@@ -390,7 +497,7 @@ internal fun SettingsAndProfilesTabContent(
         title = "Alarmes Exatos",
         subtitle = if (state.canScheduleExactAlarms) "Concedido" else "Pendente • Toque para autorizar",
         isHealthy = state.canScheduleExactAlarms,
-        shape = groupedCardShape(index = 1, totalCount = 3),
+        shape = groupedCardShape(index = 2, totalCount = 4),
         onClick = onRequestExactAlarmPermission,
       )
     }
@@ -400,12 +507,12 @@ internal fun SettingsAndProfilesTabContent(
         title = "Armazenamento 100% On-Device",
         subtitle = "Ativo • Zero dados enviados à nuvem",
         isHealthy = true,
-        shape = groupedCardShape(index = 2, totalCount = 3),
+        shape = groupedCardShape(index = 3, totalCount = 4),
         onClick = {},
       )
     }
 
-    // 5. Histórico Recente
+    // 6. Histórico Recente
     item {
       Spacer(modifier = Modifier.height(14.dp))
       Row(

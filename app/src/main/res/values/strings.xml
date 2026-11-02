@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Manage Sound Mode</string>
+    <string name="widget_description">Alterne entre Som, Vibrar, Silencioso e Perfis em 1 toque direto na tela inicial.</string>
 </resources>

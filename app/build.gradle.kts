@@ -77,8 +77,10 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
   implementation(libs.kotlinx.serialization.json)
 
-  // Data Layer & Background Work (DataStore + WorkManager + Coroutines)
+  // Data Layer & Background Work (DataStore + WorkManager + Coroutines + Glance Widgets)
   implementation(libs.androidx.datastore.preferences)
+  implementation(libs.androidx.glance.appwidget)
+  implementation(libs.androidx.glance.material3)
   implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.kotlinx.coroutines.android)
 

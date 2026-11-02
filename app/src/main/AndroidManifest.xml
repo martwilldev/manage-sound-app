@@ -4,6 +4,9 @@
     <!-- Permissão necessária para alterar modo Silencioso / DND via NotificationManager & AudioManager -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- Notificações inteligentes de timer e prompt ao silenciar pelos botões físicos (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Agendamento pontual de períodos de som (compatível com a política da Google Play) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -31,9 +34,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Permite abrir o app com toque longo no Quick Settings Tile -->
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+            </intent-filter>
         </activity>
 
-        <!-- Receiver para Alarmes de Horário, Boot do Sistema e Mudança de Fuso/Relógio -->
+        <!-- Receiver para Alarmes de Horário, Boot do Sistema, Notificações e Widgets -->
         <receiver
             android:name=".receiver.SystemAutomationReceiver"
             android:enabled="true"
@@ -45,7 +52,27 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
                 <action android:name="com.managesoundmode.app.action.EVALUATE_RULES_ALARM" />
+                <action android:name="com.managesoundmode.app.action.NOTIFICATION_START_TIMER" />
+                <action android:name="com.managesoundmode.app.action.NOTIFICATION_EXTEND_TIMER" />
+                <action android:name="com.managesoundmode.app.action.NOTIFICATION_RESTORE_NOW" />
+                <action android:name="com.managesoundmode.app.action.NOTIFICATION_REAPPLY_RULE" />
+                <action android:name="com.managesoundmode.app.action.WIDGET_SET_MODE" />
+                <action android:name="com.managesoundmode.app.action.WIDGET_CYCLE_MODE" />
+                <action android:name="com.managesoundmode.app.action.ACTIVATE_PROFILE" />
             </intent-filter>
+        </receiver>
+
+        <!-- Widget de Tela Inicial com Jetpack Glance (2x1, 4x1 e 4x2) -->
+        <receiver
+            android:name=".widget.SoundModeWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sound_mode_widget_info" />
         </receiver>
 
         <!-- Quick Settings Tile nativo na barra de status do Android -->

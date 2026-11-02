@@ -24,6 +24,7 @@ data class DeviceSoundSnapshot(
   val canScheduleExactAlarms: Boolean = true,
   val hasLocationPermission: Boolean = false,
   val hasBackgroundLocationPermission: Boolean = false,
+  val hasNotificationPermission: Boolean = true,
   val isMusicActive: Boolean = false,
   val isBluetoothHeadsetConnected: Boolean = false,
   val activeProfileId: String? = null,

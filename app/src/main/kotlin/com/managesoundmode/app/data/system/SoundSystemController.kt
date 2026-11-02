@@ -37,6 +37,7 @@ interface SoundSystemController {
   fun canScheduleExactAlarms(): Boolean = true
   fun hasLocationPermission(): Boolean = false
   fun hasBackgroundLocationPermission(): Boolean = false
+  fun hasNotificationPermission(): Boolean = true
   fun isMusicActive(): Boolean = false
   fun isBluetoothHeadsetConnected(): Boolean = false
   fun applySoundMode(mode: SoundMode): Result<SoundMode>
@@ -153,6 +154,17 @@ class AndroidSoundSystemController(
       ) == PackageManager.PERMISSION_GRANTED
     } else {
       hasLocationPermission()
+    }
+  }
+
+  override fun hasNotificationPermission(): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      ContextCompat.checkSelfPermission(
+        appContext,
+        Manifest.permission.POST_NOTIFICATIONS,
+      ) == PackageManager.PERMISSION_GRANTED
+    } else {
+      true
     }
   }
 

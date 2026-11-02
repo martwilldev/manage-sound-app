@@ -186,6 +186,9 @@ enum class TransitionTriggerSource(
   RESTORE("Auto-Restore"),
   BOOT("Sistema / Boot"),
   QUICK_TILE("Atalho Rápido"),
+  NOTIFICATION("Notificação"),
+  WIDGET("Widget"),
+  HARDWARE_BUTTON("Botão de Volume"),
 }
 
 @Serializable

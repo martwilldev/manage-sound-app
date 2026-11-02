@@ -1,10 +1,19 @@
 package com.managesoundmode.app.ui.main
 
+import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,17 +29,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MusicNote
@@ -38,6 +45,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -47,6 +55,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,7 +66,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -93,6 +101,7 @@ import com.managesoundmode.app.domain.model.ThemeMode
 import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.VolumeStreamType
 import com.managesoundmode.app.domain.model.VolumeStreams
+import com.managesoundmode.app.system.SmartNotificationManager
 import com.managesoundmode.app.ui.components.PillVolumeSliderRow
 import com.managesoundmode.app.ui.components.ProfileEditorBottomSheet
 import com.managesoundmode.app.ui.components.ProminentLocationDisclosureDialog
@@ -101,6 +110,7 @@ import com.managesoundmode.app.ui.components.profileIconForKey
 import com.managesoundmode.app.ui.theme.ManageSoundModeTheme
 import com.managesoundmode.app.ui.theme.onTonalContainerColor
 import com.managesoundmode.app.ui.theme.tonalContainerColor
+import com.managesoundmode.app.widget.SoundModeGlanceWidget
 
 enum class MainAppTab(
   val label: String,
@@ -110,9 +120,15 @@ enum class MainAppTab(
 ) {
   NOW(
     label = "Agora",
-    topBarTitle = "Som e Perfis",
+    topBarTitle = "Som e Modos",
     icon = Icons.AutoMirrored.Filled.VolumeUp,
     tag = "tab_now",
+  ),
+  PROFILES(
+    label = "Perfis",
+    topBarTitle = "Perfis",
+    icon = Icons.Default.Style,
+    tag = "tab_profiles",
   ),
   SCHEDULES(
     label = "Horários",
@@ -141,6 +157,12 @@ fun MainScreen(
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val context = LocalContext.current
+
+  val notificationPermissionLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.RequestPermission(),
+  ) { _ ->
+    viewModel.onRefreshSystemState()
+  }
 
   LifecycleResumeEffect(Unit) {
     viewModel.onRefreshSystemState()
@@ -183,6 +205,7 @@ fun MainScreen(
           onStreamVolumeChange = viewModel::onStreamVolumeChange,
           onActivateProfile = viewModel::onActivateProfile,
           onStartTimer = viewModel::onStartTimer,
+          onExtendTimer = viewModel::onExtendTimer,
           onCancelTimer = viewModel::onCancelTimer,
           onSaveProfile = viewModel::onSaveCurrentAsProfile,
           onUpsertProfile = viewModel::onUpsertProfile,
@@ -201,6 +224,17 @@ fun MainScreen(
               runCatching { context.startActivity(intent) }
             }
           },
+          onRequestNotificationPermission = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !state.hasNotificationPermission) {
+              notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+              val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+              }
+              runCatching { context.startActivity(intent) }
+            }
+          },
           onReapplyActiveRule = viewModel::onReapplyActiveRule,
           onUpsertScheduleRule = viewModel::onUpsertScheduleRule,
           onToggleScheduleRule = viewModel::onToggleScheduleRule,
@@ -212,8 +246,34 @@ fun MainScreen(
           onAcceptLocationDisclosure = viewModel::onAcceptLocationDisclosure,
           onDeleteCustomProfile = viewModel::onDeleteCustomProfile,
           onSetRestorePolicy = viewModel::onSetRestorePolicy,
+          onSetDefaultDayProfileId = viewModel::onSetDefaultDayProfileId,
           onSetThemeMode = viewModel::onSetThemeMode,
           onSetUseDynamicColor = viewModel::onSetUseDynamicColor,
+          onSetMuteMediaOnSilent = viewModel::onSetMuteMediaOnSilent,
+          onSetPreserveMediaOnBluetooth = viewModel::onSetPreserveMediaOnBluetooth,
+          onSetSmartVolumeTriggerEnabled = viewModel::onSetSmartVolumeTriggerEnabled,
+          onTestSmartNotification = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !state.hasNotificationPermission) {
+              notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+              val previewMode = if (state.currentMode == SoundMode.NORMAL) SoundMode.VIBRATE else state.currentMode
+              SmartNotificationManager.showSmartRestorePrompt(
+                context = context,
+                mode = previewMode,
+                mediaAutoMuted = state.muteMediaOnSilent,
+              )
+            }
+          },
+          onPinHomeWidget = {
+            val pinned = SoundModeGlanceWidget.requestPinWidget(context)
+            if (!pinned) {
+              val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+              }
+              runCatching { context.startActivity(intent) }
+            }
+          },
           onClearLogs = viewModel::onClearTransitionLogs,
           modifier = modifier,
         )
@@ -234,10 +294,12 @@ internal fun MainDashboardContent(
   onSaveProfile: (String, String) -> Unit,
   onDismissMessage: () -> Unit,
   onRequestDndPermission: () -> Unit,
+  onExtendTimer: (Int) -> Unit = {},
   onUpsertProfile: (SoundProfile, Boolean) -> Unit = { profile, _ ->
     onSaveProfile(profile.name, profile.description)
   },
   onRequestExactAlarmPermission: () -> Unit = {},
+  onRequestNotificationPermission: () -> Unit = {},
   onReapplyActiveRule: () -> Unit = {},
   onUpsertScheduleRule: (ScheduleRule) -> Unit = {},
   onToggleScheduleRule: (ScheduleRule, Boolean) -> Unit = { _, _ -> },
@@ -249,8 +311,14 @@ internal fun MainDashboardContent(
   onAcceptLocationDisclosure: () -> Unit = {},
   onDeleteCustomProfile: (String) -> Unit = {},
   onSetRestorePolicy: (RestorePolicy) -> Unit = {},
+  onSetDefaultDayProfileId: (String) -> Unit = {},
   onSetThemeMode: (ThemeMode) -> Unit = {},
   onSetUseDynamicColor: (Boolean) -> Unit = {},
+  onSetMuteMediaOnSilent: (Boolean) -> Unit = {},
+  onSetPreserveMediaOnBluetooth: (Boolean) -> Unit = {},
+  onSetSmartVolumeTriggerEnabled: (Boolean) -> Unit = {},
+  onTestSmartNotification: () -> Unit = {},
+  onPinHomeWidget: () -> Unit = {},
   onClearLogs: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
@@ -371,7 +439,6 @@ internal fun MainDashboardContent(
           )
         },
         actions = {
-          // Botão rápido de alternância Dark / Light Mode no topo
           val isLight = state.themeMode == ThemeMode.LIGHT
           IconButton(
             onClick = {
@@ -438,7 +505,13 @@ internal fun MainDashboardContent(
                 contentDescription = tab.label,
               )
             },
-            label = { Text(tab.label) },
+            label = {
+              Text(
+                text = tab.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+            },
             modifier = Modifier.testTag(tab.tag),
           )
         }
@@ -451,6 +524,19 @@ internal fun MainDashboardContent(
           state = state,
           onSelectMode = onSelectMode,
           onStreamVolumeChange = onStreamVolumeChange,
+          onOpenProfilesTab = { selectedTab = MainAppTab.PROFILES },
+          onStartTimer = onStartTimer,
+          onExtendTimer = onExtendTimer,
+          onCancelTimer = onCancelTimer,
+          onRequestDndPermission = onRequestDndPermission,
+          onReapplyActiveRule = onReapplyActiveRule,
+          modifier = Modifier.padding(innerPadding),
+        )
+      }
+
+      MainAppTab.PROFILES -> {
+        ProfilesTabContent(
+          state = state,
           onActivateProfile = onActivateProfile,
           onEditProfile = { profile ->
             editingProfile = profile
@@ -460,10 +546,7 @@ internal fun MainDashboardContent(
             editingProfile = null
             showProfileBottomSheet = true
           },
-          onStartTimer = onStartTimer,
-          onCancelTimer = onCancelTimer,
-          onRequestDndPermission = onRequestDndPermission,
-          onReapplyActiveRule = onReapplyActiveRule,
+          onSetDefaultDayProfileId = onSetDefaultDayProfileId,
           modifier = Modifier.padding(innerPadding),
         )
       }
@@ -499,20 +582,17 @@ internal fun MainDashboardContent(
       MainAppTab.SETTINGS -> {
         SettingsAndProfilesTabContent(
           state = state,
-          onActivateProfile = onActivateProfile,
-          onEditProfile = { profile ->
-            editingProfile = profile
-            showProfileBottomSheet = true
-          },
-          onCreateNewProfile = {
-            editingProfile = null
-            showProfileBottomSheet = true
-          },
           onSetRestorePolicy = onSetRestorePolicy,
           onSetThemeMode = onSetThemeMode,
           onSetUseDynamicColor = onSetUseDynamicColor,
+          onSetMuteMediaOnSilent = onSetMuteMediaOnSilent,
+          onSetPreserveMediaOnBluetooth = onSetPreserveMediaOnBluetooth,
+          onSetSmartVolumeTriggerEnabled = onSetSmartVolumeTriggerEnabled,
+          onTestSmartNotification = onTestSmartNotification,
+          onPinHomeWidget = onPinHomeWidget,
           onRequestDndPermission = onRequestDndPermission,
           onRequestExactAlarmPermission = onRequestExactAlarmPermission,
+          onRequestNotificationPermission = onRequestNotificationPermission,
           onClearLogs = onClearLogs,
           modifier = Modifier.padding(innerPadding),
         )
@@ -526,23 +606,23 @@ private fun NowTabContent(
   state: MainScreenUiState.Ready,
   onSelectMode: (SoundMode) -> Unit,
   onStreamVolumeChange: (VolumeStreamType, Int) -> Unit,
-  onActivateProfile: (SoundProfile) -> Unit,
-  onEditProfile: (SoundProfile) -> Unit,
-  onCreateNewProfile: () -> Unit,
+  onOpenProfilesTab: () -> Unit,
   onStartTimer: (SoundMode, Int) -> Unit,
+  onExtendTimer: (Int) -> Unit,
   onCancelTimer: () -> Unit,
   onRequestDndPermission: () -> Unit,
   onReapplyActiveRule: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val haptics = LocalHapticFeedback.current
+  val activeProfile = state.profiles.firstOrNull { it.id == state.activeProfileId }
 
   LazyColumn(
     modifier = modifier
       .fillMaxSize()
       .testTag("now_tab_list"),
-    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-    verticalArrangement = Arrangement.spacedBy(12.dp),
+    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
+    verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     if (!state.hasDndPermission) {
       item {
@@ -556,20 +636,28 @@ private fun NowTabContent(
       }
     }
 
-    // 1. Hero Card Tonal + Seletor de Modo + Pausa Rápida Integrados (100% Material 3 Tonal)
+    // Bloco 1: Hero Card Contextual (Com Chip compacto do Perfil Ativo + Timer Embutido Sob Demanda)
     item {
       UnifiedHeroAndModeCard(
         currentMode = state.currentMode,
+        activeProfile = activeProfile,
         activeTimer = state.activeTimer,
         activeRuleTitle = state.activeRuleTitle,
         activeRuleSubtitle = state.activeRuleSubtitle,
+        muteMediaOnSilent = state.muteMediaOnSilent,
         onSelectMode = { mode ->
           haptics.performHapticFeedback(HapticFeedbackType.LongPress)
           onSelectMode(mode)
         },
+        onOpenProfilesTab = onOpenProfilesTab,
         onStartTimer = { minutes ->
           haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-          onStartTimer(SoundMode.VIBRATE, minutes)
+          val targetMode = if (state.currentMode == SoundMode.NORMAL) SoundMode.VIBRATE else state.currentMode
+          onStartTimer(targetMode, minutes)
+        },
+        onExtendTimer = { addMinutes ->
+          haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+          onExtendTimer(addMinutes)
         },
         onCancelTimer = {
           haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -578,21 +666,7 @@ private fun NowTabContent(
       )
     }
 
-    // 2. Carrossel de Perfis no Topo (Above the Fold — 1 Toque Ativa, Lápis Edita)
-    item {
-      ProfilesQuickCarouselSection(
-        profiles = state.profiles,
-        activeProfileId = state.activeProfileId,
-        onActivateProfile = { profile ->
-          haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-          onActivateProfile(profile)
-        },
-        onEditProfile = onEditProfile,
-        onCreateNewProfile = onCreateNewProfile,
-      )
-    }
-
-    // 3. Painel de Volumes Estilo Android 15
+    // Bloco 2: Card Único Agrupado de Volumes (100% Zero Scroll no estado padrão)
     item {
       VolumeStreamsCard(
         streams = state.streams,
@@ -605,11 +679,15 @@ private fun NowTabContent(
 @Composable
 private fun UnifiedHeroAndModeCard(
   currentMode: SoundMode,
+  activeProfile: SoundProfile?,
   activeTimer: TimedModeSession?,
   activeRuleTitle: String?,
   activeRuleSubtitle: String?,
+  muteMediaOnSilent: Boolean,
   onSelectMode: (SoundMode) -> Unit,
+  onOpenProfilesTab: () -> Unit,
   onStartTimer: (Int) -> Unit,
+  onExtendTimer: (Int) -> Unit,
   onCancelTimer: () -> Unit,
 ) {
   val animatedContainer by animateColorAsState(
@@ -622,6 +700,9 @@ private fun UnifiedHeroAndModeCard(
     animationSpec = tween(durationMillis = 220),
     label = "heroOnTonalContainer",
   )
+
+  // O Timer Contextual aparece SOMENTE quando o celular está em Vibrar/Silencioso ou quando há um timer rodando
+  val showContextualTimerRow = currentMode != SoundMode.NORMAL || activeTimer != null
 
   Card(
     modifier = Modifier
@@ -638,7 +719,7 @@ private fun UnifiedHeroAndModeCard(
         .padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-      // Cabeçalho Tonal Expressivo (Sem borda neon!)
+      // Cabeçalho Tonal Expressivo + Chip Compacto do Perfil Ativo à direita
       Surface(
         shape = RoundedCornerShape(22.dp),
         color = animatedContainer,
@@ -647,44 +728,91 @@ private fun UnifiedHeroAndModeCard(
         Row(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(14.dp),
+          horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-          Box(
-            modifier = Modifier
-              .size(48.dp)
-              .clip(CircleShape)
-              .background(animatedOnContainer.copy(alpha = 0.14f)),
-            contentAlignment = Alignment.Center,
+          Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
           ) {
-            Icon(
-              imageVector = currentMode.modeIcon(),
-              contentDescription = null,
-              tint = animatedOnContainer,
-              modifier = Modifier.size(26.dp),
-            )
+            Box(
+              modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(animatedOnContainer.copy(alpha = 0.14f)),
+              contentAlignment = Alignment.Center,
+            ) {
+              Icon(
+                imageVector = currentMode.modeIcon(),
+                contentDescription = null,
+                tint = animatedOnContainer,
+                modifier = Modifier.size(24.dp),
+              )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = currentMode.title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = animatedOnContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+              val cleanSubtitle = when {
+                activeRuleTitle != null -> activeRuleTitle
+                currentMode != SoundMode.NORMAL && muteMediaOnSilent ->
+                  "${currentMode.subtitle} • Mídia 0%"
+                else -> activeRuleSubtitle ?: currentMode.subtitle
+              }
+              Text(
+                text = cleanSubtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = animatedOnContainer.copy(alpha = 0.82f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
           }
 
-          Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = activeRuleTitle ?: "Modo do Sistema",
-              style = MaterialTheme.typography.labelLarge,
-              color = animatedOnContainer.copy(alpha = 0.8f),
-            )
-            Text(
-              text = currentMode.title,
-              style = MaterialTheme.typography.headlineSmall,
-              fontWeight = FontWeight.Bold,
-              color = animatedOnContainer,
-            )
-            Text(
-              text = activeRuleSubtitle ?: currentMode.subtitle,
-              style = MaterialTheme.typography.bodySmall,
-              color = animatedOnContainer.copy(alpha = 0.85f),
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
-            )
+          Spacer(modifier = Modifier.width(8.dp))
+
+          // Chip Compacto do Perfil Ativo (Tocar abre a aba Perfis)
+          Surface(
+            modifier = Modifier
+              .clip(RoundedCornerShape(14.dp))
+              .clickable(onClick = onOpenProfilesTab)
+              .testTag("active_profile_chip"),
+            shape = RoundedCornerShape(14.dp),
+            color = animatedOnContainer.copy(alpha = 0.14f),
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+              Icon(
+                imageVector = activeProfile?.let { profileIconForKey(it.iconKey) } ?: Icons.Default.Style,
+                contentDescription = null,
+                tint = animatedOnContainer,
+                modifier = Modifier.size(15.dp),
+              )
+              Text(
+                text = activeProfile?.name ?: "Perfis",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = animatedOnContainer,
+                maxLines = 1,
+              )
+              Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = animatedOnContainer.copy(alpha = 0.8f),
+                modifier = Modifier.size(15.dp),
+              )
+            }
           }
         }
       }
@@ -718,7 +846,7 @@ private fun UnifiedHeroAndModeCard(
           Surface(
             modifier = Modifier
               .weight(1f)
-              .heightIn(min = 52.dp)
+              .heightIn(min = 48.dp)
               .clip(RoundedCornerShape(18.dp))
               .clickable { onSelectMode(mode) }
               .semantics { contentDescription = "Modo ${mode.title}" }
@@ -729,7 +857,7 @@ private fun UnifiedHeroAndModeCard(
             Row(
               modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(horizontal = 8.dp, vertical = 11.dp),
               horizontalArrangement = Arrangement.Center,
               verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -756,218 +884,95 @@ private fun UnifiedHeroAndModeCard(
         }
       }
 
-      // Faixa Compacta de Pausa Rápida (Timer em 1 linha, sem texto quebrado!)
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+      // Gaveta Contextual de Timer: SÓ aparece em Vibrar ou Silencioso (ou quando há timer ativo)
+      AnimatedVisibility(
+        visible = showContextualTimerRow,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut(),
       ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          Icon(
-            imageVector = Icons.Default.AccessTime,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp),
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+          HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
           )
-          Text(
-            text = if (activeTimer != null) {
-              "Pausa ativa (${activeTimer.durationMinutes}m)"
-            } else {
-              "Pausa rápida:"
-            },
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-
-        if (activeTimer != null) {
-          FilledTonalButton(
-            onClick = onCancelTimer,
-            modifier = Modifier.testTag("cancel_timer_button"),
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
           ) {
-            Text("Restaurar Agora")
-          }
-        } else {
-          Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(15 to "15m", 30 to "30m", 45 to "45m", 60 to "1h").forEach { (minutes, label) ->
-              Surface(
-                modifier = Modifier
-                  .clip(RoundedCornerShape(50))
-                  .clickable { onStartTimer(minutes) }
-                  .testTag("timer_chip_$minutes"),
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+              Icon(
+                imageVector = Icons.Default.AccessTime,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp),
+              )
+              val remainingMinutes = activeTimer?.remainingMinutes(System.currentTimeMillis())
+              Text(
+                text = if (activeTimer != null && remainingMinutes != null && remainingMinutes > 0) {
+                  "Volta em ${remainingMinutes}m"
+                } else {
+                  "Manter por:"
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+
+            if (activeTimer != null) {
+              Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
               ) {
-                Text(
-                  text = label,
-                  style = MaterialTheme.typography.labelMedium,
-                  fontWeight = FontWeight.Medium,
-                  color = MaterialTheme.colorScheme.onSurface,
-                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                )
+                Surface(
+                  modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable { onExtendTimer(30) },
+                  shape = RoundedCornerShape(50),
+                  color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                  Text(
+                    text = "+30m",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                  )
+                }
+                FilledTonalButton(
+                  onClick = onCancelTimer,
+                  contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                  modifier = Modifier.testTag("cancel_timer_button"),
+                ) {
+                  Text("Restaurar", style = MaterialTheme.typography.labelMedium)
+                }
+              }
+            } else {
+              Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(15 to "15m", 30 to "30m", 60 to "1h", 120 to "2h").forEach { (minutes, label) ->
+                  Surface(
+                    modifier = Modifier
+                      .clip(RoundedCornerShape(50))
+                      .clickable { onStartTimer(minutes) }
+                      .testTag("timer_chip_$minutes"),
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                  ) {
+                    Text(
+                      text = label,
+                      style = MaterialTheme.typography.labelMedium,
+                      fontWeight = FontWeight.Medium,
+                      color = MaterialTheme.colorScheme.onSurface,
+                      modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    )
+                  }
+                }
               }
             }
           }
         }
-      }
-    }
-  }
-}
-
-@Composable
-private fun ProfilesQuickCarouselSection(
-  profiles: List<SoundProfile>,
-  activeProfileId: String?,
-  onActivateProfile: (SoundProfile) -> Unit,
-  onEditProfile: (SoundProfile) -> Unit,
-  onCreateNewProfile: () -> Unit,
-) {
-  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Text(
-        text = "Perfis",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onBackground,
-      )
-      TextButton(
-        onClick = onCreateNewProfile,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-        modifier = Modifier.testTag("save_profile_button"),
-      ) {
-        Icon(
-          imageVector = Icons.Default.Add,
-          contentDescription = null,
-          modifier = Modifier.size(16.dp),
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text("Novo Perfil")
-      }
-    }
-
-    LazyRow(
-      horizontalArrangement = Arrangement.spacedBy(10.dp),
-      contentPadding = PaddingValues(end = 4.dp),
-    ) {
-      items(
-        items = profiles,
-        key = { it.id },
-      ) { profile ->
-        val isActive = activeProfileId == profile.id
-        ProfileQuickTile(
-          profile = profile,
-          isActive = isActive,
-          onClick = { onActivateProfile(profile) },
-          onEditClick = { onEditProfile(profile) },
-        )
-      }
-    }
-  }
-}
-
-@Composable
-private fun ProfileQuickTile(
-  profile: SoundProfile,
-  isActive: Boolean,
-  onClick: () -> Unit,
-  onEditClick: () -> Unit,
-) {
-  val containerColor = if (isActive) {
-    MaterialTheme.colorScheme.secondaryContainer
-  } else {
-    MaterialTheme.colorScheme.surfaceContainerLow
-  }
-  val contentColor = if (isActive) {
-    MaterialTheme.colorScheme.onSecondaryContainer
-  } else {
-    MaterialTheme.colorScheme.onSurface
-  }
-
-  Card(
-    modifier = Modifier
-      .width(156.dp)
-      .clip(RoundedCornerShape(22.dp))
-      .clickable(onClick = onClick)
-      .testTag("profile_card_${profile.id}"),
-    shape = RoundedCornerShape(22.dp),
-    colors = CardDefaults.cardColors(containerColor = containerColor),
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(14.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Box(
-          modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(
-              if (isActive) {
-                MaterialTheme.colorScheme.primary
-              } else {
-                MaterialTheme.colorScheme.surfaceContainerHighest
-              },
-            ),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            imageVector = profileIconForKey(profile.iconKey),
-            contentDescription = null,
-            tint = if (isActive) {
-              MaterialTheme.colorScheme.onPrimary
-            } else {
-              MaterialTheme.colorScheme.primary
-            },
-            modifier = Modifier.size(18.dp),
-          )
-        }
-
-        Box(
-          modifier = Modifier
-            .size(30.dp)
-            .clip(CircleShape)
-            .clickable(onClick = onEditClick)
-            .testTag("edit_profile_${profile.id}"),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            imageVector = Icons.Default.Edit,
-            contentDescription = "Editar ${profile.name}",
-            tint = contentColor.copy(alpha = 0.65f),
-            modifier = Modifier.size(15.dp),
-          )
-        }
-      }
-
-      Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-          text = profile.name,
-          style = MaterialTheme.typography.titleSmall,
-          fontWeight = FontWeight.SemiBold,
-          color = contentColor,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-          text = profile.summaryLabel(),
-          style = MaterialTheme.typography.labelSmall,
-          color = contentColor.copy(alpha = 0.75f),
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
       }
     }
   }
@@ -1080,7 +1085,7 @@ private fun VolumeStreamsCard(
 ) {
   Card(
     modifier = Modifier.fillMaxWidth(),
-    shape = RoundedCornerShape(26.dp),
+    shape = RoundedCornerShape(28.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ),
@@ -1088,13 +1093,14 @@ private fun VolumeStreamsCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 18.dp, vertical = 16.dp),
-      verticalArrangement = Arrangement.spacedBy(8.dp),
+        .padding(horizontal = 18.dp, vertical = 14.dp),
+      verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       Text(
-        text = "Canais de Volume Independentes",
+        text = "Volumes",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(bottom = 2.dp),
       )
 
       PillVolumeSliderRow(
@@ -1103,18 +1109,21 @@ private fun VolumeStreamsCard(
         percent = streams.ringPercent,
         onValueChangeFinished = { onStreamVolumeChange(VolumeStreamType.RING, it) },
       )
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
       PillVolumeSliderRow(
         type = VolumeStreamType.NOTIFICATION,
         icon = Icons.Default.Notifications,
         percent = streams.notificationPercent,
         onValueChangeFinished = { onStreamVolumeChange(VolumeStreamType.NOTIFICATION, it) },
       )
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
       PillVolumeSliderRow(
         type = VolumeStreamType.MEDIA,
         icon = Icons.Default.MusicNote,
         percent = streams.mediaPercent,
         onValueChangeFinished = { onStreamVolumeChange(VolumeStreamType.MEDIA, it) },
       )
+      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
       PillVolumeSliderRow(
         type = VolumeStreamType.ALARM,
         icon = Icons.Default.Alarm,

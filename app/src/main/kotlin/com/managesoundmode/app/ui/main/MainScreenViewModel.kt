@@ -42,6 +42,7 @@ sealed interface MainScreenUiState {
     val canScheduleExactAlarms: Boolean = true,
     val hasLocationPermission: Boolean = false,
     val hasBackgroundLocationPermission: Boolean = false,
+    val hasNotificationPermission: Boolean = true,
     val isMusicActive: Boolean = false,
     val isBluetoothHeadsetConnected: Boolean = false,
     val activeRuleTitle: String? = null,
@@ -55,6 +56,9 @@ sealed interface MainScreenUiState {
     val useDynamicColor: Boolean = true,
     val themeMode: ThemeMode = ThemeMode.DARK,
     val hasAcceptedLocationDisclosure: Boolean = false,
+    val muteMediaOnSilent: Boolean = true,
+    val preserveMediaOnBluetooth: Boolean = true,
+    val smartVolumeTriggerEnabled: Boolean = true,
   ) : MainScreenUiState
 
   data class Error(val message: String) : MainScreenUiState
@@ -83,6 +87,7 @@ class MainScreenViewModel(
       canScheduleExactAlarms = snapshot.canScheduleExactAlarms,
       hasLocationPermission = snapshot.hasLocationPermission,
       hasBackgroundLocationPermission = snapshot.hasBackgroundLocationPermission,
+      hasNotificationPermission = snapshot.hasNotificationPermission,
       isMusicActive = snapshot.isMusicActive,
       isBluetoothHeadsetConnected = snapshot.isBluetoothHeadsetConnected,
       activeRuleTitle = snapshot.activeRuleTitle,
@@ -96,6 +101,9 @@ class MainScreenViewModel(
       useDynamicColor = prefs.useDynamicColor,
       themeMode = prefs.themeMode,
       hasAcceptedLocationDisclosure = prefs.hasAcceptedLocationDisclosure,
+      muteMediaOnSilent = prefs.muteMediaOnSilent,
+      preserveMediaOnBluetooth = prefs.preserveMediaOnBluetooth,
+      smartVolumeTriggerEnabled = prefs.smartVolumeTriggerEnabled,
     ) as MainScreenUiState
   }
     .catch { throwable ->
@@ -155,6 +163,15 @@ class MainScreenViewModel(
         }
         .onFailure { error ->
           feedbackMessage.value = error.message ?: "Falha ao iniciar temporizador"
+        }
+    }
+  }
+
+  fun onExtendTimer(additionalMinutes: Int) {
+    viewModelScope.launch {
+      repository.extendTimedSession(additionalMinutes = additionalMinutes)
+        .onSuccess {
+          feedbackMessage.value = "Timer estendido em +$additionalMinutes min"
         }
     }
   }
@@ -329,6 +346,24 @@ class MainScreenViewModel(
   fun onAcceptLocationDisclosure() {
     viewModelScope.launch {
       repository.setLocationDisclosureAccepted(true)
+    }
+  }
+
+  fun onSetMuteMediaOnSilent(enabled: Boolean) {
+    viewModelScope.launch {
+      repository.setMuteMediaOnSilent(enabled)
+    }
+  }
+
+  fun onSetPreserveMediaOnBluetooth(enabled: Boolean) {
+    viewModelScope.launch {
+      repository.setPreserveMediaOnBluetooth(enabled)
+    }
+  }
+
+  fun onSetSmartVolumeTriggerEnabled(enabled: Boolean) {
+    viewModelScope.launch {
+      repository.setSmartVolumeTriggerEnabled(enabled)
     }
   }
 

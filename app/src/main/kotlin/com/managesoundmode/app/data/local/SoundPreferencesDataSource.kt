@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.managesoundmode.app.domain.model.LocationRule
@@ -43,6 +44,10 @@ data class PersistedSoundPrefs(
   val useDynamicColor: Boolean = true,
   val themeMode: ThemeMode = ThemeMode.DARK,
   val hasAcceptedLocationDisclosure: Boolean = false,
+  val muteMediaOnSilent: Boolean = true,
+  val preserveMediaOnBluetooth: Boolean = true,
+  val smartVolumeTriggerEnabled: Boolean = true,
+  val savedMediaBeforeMute: Int? = null,
 )
 
 interface SoundPreferencesDataSource {
@@ -65,6 +70,10 @@ interface SoundPreferencesDataSource {
   suspend fun setUseDynamicColor(enabled: Boolean) {}
   suspend fun setThemeMode(mode: ThemeMode) {}
   suspend fun setLocationDisclosureAccepted(accepted: Boolean) {}
+  suspend fun setMuteMediaOnSilent(enabled: Boolean) {}
+  suspend fun setPreserveMediaOnBluetooth(enabled: Boolean) {}
+  suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean) {}
+  suspend fun setSavedMediaBeforeMute(percent: Int?) {}
 }
 
 class DataStoreSoundPreferencesDataSource(
@@ -142,6 +151,10 @@ class DataStoreSoundPreferencesDataSource(
           useDynamicColor = prefs[KEY_USE_DYNAMIC_COLOR] ?: true,
           themeMode = themeMode,
           hasAcceptedLocationDisclosure = prefs[KEY_LOCATION_DISCLOSURE_ACCEPTED] ?: false,
+          muteMediaOnSilent = prefs[KEY_MUTE_MEDIA_ON_SILENT] ?: true,
+          preserveMediaOnBluetooth = prefs[KEY_PRESERVE_MEDIA_ON_BT] ?: true,
+          smartVolumeTriggerEnabled = prefs[KEY_SMART_VOLUME_TRIGGER] ?: true,
+          savedMediaBeforeMute = prefs[KEY_SAVED_MEDIA_BEFORE_MUTE],
         )
       }
 
@@ -315,6 +328,34 @@ class DataStoreSoundPreferencesDataSource(
     }
   }
 
+  override suspend fun setMuteMediaOnSilent(enabled: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_MUTE_MEDIA_ON_SILENT] = enabled
+    }
+  }
+
+  override suspend fun setPreserveMediaOnBluetooth(enabled: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_PRESERVE_MEDIA_ON_BT] = enabled
+    }
+  }
+
+  override suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_SMART_VOLUME_TRIGGER] = enabled
+    }
+  }
+
+  override suspend fun setSavedMediaBeforeMute(percent: Int?) {
+    context.soundDataStore.edit { prefs ->
+      if (percent == null) {
+        prefs.remove(KEY_SAVED_MEDIA_BEFORE_MUTE)
+      } else {
+        prefs[KEY_SAVED_MEDIA_BEFORE_MUTE] = percent
+      }
+    }
+  }
+
   private companion object {
     const val TAG = "SoundPrefsDataSource"
     const val MAX_LOG_ENTRIES = 30
@@ -332,5 +373,9 @@ class DataStoreSoundPreferencesDataSource(
     val KEY_USE_DYNAMIC_COLOR = booleanPreferencesKey("use_dynamic_color")
     val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     val KEY_LOCATION_DISCLOSURE_ACCEPTED = booleanPreferencesKey("location_disclosure_accepted")
+    val KEY_MUTE_MEDIA_ON_SILENT = booleanPreferencesKey("mute_media_on_silent")
+    val KEY_PRESERVE_MEDIA_ON_BT = booleanPreferencesKey("preserve_media_on_bt")
+    val KEY_SMART_VOLUME_TRIGGER = booleanPreferencesKey("smart_volume_trigger")
+    val KEY_SAVED_MEDIA_BEFORE_MUTE = intPreferencesKey("saved_media_before_mute")
   }
 }

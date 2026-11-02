@@ -42,6 +42,7 @@ class MainScreenTest {
     composeTestRule.onNodeWithTag("mode_button_NORMAL").assertIsDisplayed()
     composeTestRule.onNodeWithTag("mode_button_VIBRATE").assertIsDisplayed()
     composeTestRule.onNodeWithTag("mode_button_SILENT").assertIsDisplayed()
-    composeTestRule.onNodeWithText("Canais de Volume Independentes").assertIsDisplayed()
+    composeTestRule.onNodeWithTag("tab_profiles").assertIsDisplayed()
+    composeTestRule.onNodeWithText("Volumes").assertIsDisplayed()
   }
 }
