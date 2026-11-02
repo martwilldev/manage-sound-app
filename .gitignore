@@ -1,0 +1,24 @@
+# OS & IDE
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies & Build Outputs
+node_modules/
+dist/
+build/
+.gradle/
+.kotlin/
+*.apk
+*.aab
+*.ipa
+__pycache__/
+.venv/
+coverage/
+*.log
