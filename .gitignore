@@ -1,24 +1,15 @@
-# OS & IDE
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
 .DS_Store
-.idea/
-.vscode/*
-!.vscode/settings.json
-
-# Secrets
-.env
-.env.*
-!.env.example
-
-# Dependencies & Build Outputs
-node_modules/
-dist/
-build/
-.gradle/
-.kotlin/
-*.apk
-*.aab
-*.ipa
-__pycache__/
-.venv/
-coverage/
-*.log
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
