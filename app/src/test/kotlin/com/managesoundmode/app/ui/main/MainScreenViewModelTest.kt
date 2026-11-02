@@ -185,6 +185,71 @@ class MainScreenViewModelTest {
     assertEquals(15, updatedPreset.streams.mediaPercent)
     assertEquals("preset_work_high", afterEdit.activeProfileId)
   }
+
+  @Test
+  fun onUpsertProfile_whenEditingActiveProfileWithoutApplyNow_stillSyncsHardwareStreams() = runTest {
+    fakePreferences.clearSchedules()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    val initialReady = viewModel.uiState.value as MainScreenUiState.Ready
+    val workPreset = initialReady.profiles.first { it.id == "preset_work_high" }
+    viewModel.onActivateProfile(workPreset)
+
+    val editedWork = workPreset.copy(
+      streams = workPreset.streams.copy(ringPercent = 64, mediaPercent = 22),
+    )
+    viewModel.onUpsertProfile(editedWork, applyImmediately = false)
+
+    val afterEdit = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals("preset_work_high", afterEdit.activeProfileId)
+    assertEquals(64, afterEdit.streams.ringPercent)
+    assertEquals(22, afterEdit.streams.mediaPercent)
+  }
+
+  @Test
+  fun onSetMuteMediaOnSilent_whileInVibrate_immediatelyMutesAndRestoresMedia() = runTest {
+    fakePreferences.clearSchedules()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    // Start in NORMAL with muteMediaOnSilent disabled and media at 60%
+    viewModel.onSetMuteMediaOnSilent(false)
+    viewModel.onStreamVolumeChange(VolumeStreamType.MEDIA, 60)
+    viewModel.onSelectMode(SoundMode.VIBRATE)
+
+    val beforeToggle = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(SoundMode.VIBRATE, beforeToggle.currentMode)
+    assertEquals(60, beforeToggle.streams.mediaPercent)
+
+    // Enable muteMediaOnSilent while already in VIBRATE -> media should immediately drop to 0%
+    viewModel.onSetMuteMediaOnSilent(true)
+    val afterEnable = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(0, afterEnable.streams.mediaPercent)
+
+    // Disable muteMediaOnSilent while still in VIBRATE -> media should restore to 60%
+    viewModel.onSetMuteMediaOnSilent(false)
+    val afterDisable = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(60, afterDisable.streams.mediaPercent)
+  }
+
+  @Test
+  fun onStreamVolumeChange_ringAboveZeroInVibrate_switchesModeToNormal() = runTest {
+    fakePreferences.clearSchedules()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    viewModel.onSelectMode(SoundMode.VIBRATE)
+    assertEquals(SoundMode.VIBRATE, (viewModel.uiState.value as MainScreenUiState.Ready).currentMode)
+
+    viewModel.onStreamVolumeChange(VolumeStreamType.RING, 70)
+    val afterRing = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(SoundMode.NORMAL, afterRing.currentMode)
+    assertEquals(70, afterRing.streams.ringPercent)
+  }
 }
 
 private class FakeSoundSystemController : SoundSystemController {
@@ -311,5 +376,21 @@ private class FakeSoundPreferencesDataSource : SoundPreferencesDataSource {
 
   override suspend fun setLocationDisclosureAccepted(accepted: Boolean) {
     state.value = state.value.copy(hasAcceptedLocationDisclosure = accepted)
+  }
+
+  override suspend fun setMuteMediaOnSilent(enabled: Boolean) {
+    state.value = state.value.copy(muteMediaOnSilent = enabled)
+  }
+
+  override suspend fun setPreserveMediaOnBluetooth(enabled: Boolean) {
+    state.value = state.value.copy(preserveMediaOnBluetooth = enabled)
+  }
+
+  override suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean) {
+    state.value = state.value.copy(smartVolumeTriggerEnabled = enabled)
+  }
+
+  override suspend fun setSavedMediaBeforeMute(percent: Int?) {
+    state.value = state.value.copy(savedMediaBeforeMute = percent)
   }
 }

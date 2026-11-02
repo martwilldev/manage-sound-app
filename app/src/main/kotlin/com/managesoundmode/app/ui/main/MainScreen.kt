@@ -353,6 +353,9 @@ internal fun MainDashboardContent(
         showProfileBottomSheet = false
         editingProfile = null
         onUpsertProfile(profile, applyNow)
+        if (applyNow) {
+          selectedTab = MainAppTab.NOW
+        }
       },
       onDeleteProfile = { profileId ->
         showProfileBottomSheet = false
@@ -462,6 +465,17 @@ internal fun MainDashboardContent(
     },
     floatingActionButton = {
       when (selectedTab) {
+        MainAppTab.PROFILES -> {
+          ExtendedFloatingActionButton(
+            onClick = {
+              editingProfile = null
+              showProfileBottomSheet = true
+            },
+            icon = { Icon(Icons.Default.Add, contentDescription = null) },
+            text = { Text("Novo Perfil") },
+            modifier = Modifier.testTag("save_profile_button"),
+          )
+        }
         MainAppTab.SCHEDULES -> {
           ExtendedFloatingActionButton(
             onClick = {
@@ -537,13 +551,12 @@ internal fun MainDashboardContent(
       MainAppTab.PROFILES -> {
         ProfilesTabContent(
           state = state,
-          onActivateProfile = onActivateProfile,
+          onActivateProfile = { profile ->
+            onActivateProfile(profile)
+            selectedTab = MainAppTab.NOW
+          },
           onEditProfile = { profile ->
             editingProfile = profile
-            showProfileBottomSheet = true
-          },
-          onCreateNewProfile = {
-            editingProfile = null
             showProfileBottomSheet = true
           },
           onSetDefaultDayProfileId = onSetDefaultDayProfileId,

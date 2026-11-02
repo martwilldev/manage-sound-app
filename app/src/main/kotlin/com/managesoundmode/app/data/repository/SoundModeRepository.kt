@@ -214,6 +214,12 @@ class DefaultSoundModeRepository(
   }
 
   override suspend fun setStreamVolume(type: VolumeStreamType, percent: Int): Result<Unit> {
+    if ((type == VolumeStreamType.RING || type == VolumeStreamType.NOTIFICATION) &&
+      percent > 0 &&
+      systemController.readCurrentMode() != SoundMode.NORMAL
+    ) {
+      systemController.applySoundMode(SoundMode.NORMAL)
+    }
     return systemController.applyStreamVolume(type, percent).map {
       markManualOverrideIfRuleActive()
       preferencesDataSource.setActiveProfileId(null)
@@ -367,11 +373,15 @@ class DefaultSoundModeRepository(
       name = trimmedName,
       description = profile.description.trim().ifEmpty { profile.summaryLabel() },
     )
+    val prefsBefore = preferencesDataSource.prefsFlow.first()
     preferencesDataSource.upsertCustomProfile(normalized)
-    if (applyImmediately) {
+    preferencesDataSource.setOverriddenSessionKey(null)
+
+    if (applyImmediately || prefsBefore.activeProfileId == normalized.id) {
       activateProfile(normalized, source = TransitionTriggerSource.MANUAL).getOrThrow()
     } else {
       evaluateAndApplyRules(source = TransitionTriggerSource.MANUAL)
+      onRefreshExternalSurfaces()
       refreshSystemState()
     }
     normalized
@@ -379,34 +389,64 @@ class DefaultSoundModeRepository(
 
   override suspend fun deleteCustomProfile(profileId: String): Result<Unit> = runCatching {
     preferencesDataSource.deleteCustomProfile(profileId)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
   override suspend fun upsertScheduleRule(rule: ScheduleRule): Result<Unit> = runCatching {
+    val prevPrefs = preferencesDataSource.prefsFlow.first()
+    val wasPreviouslyActive = prevPrefs.lastAppliedRuleSessionKey?.contains(rule.id) == true
     preferencesDataSource.upsertScheduleRule(rule)
+    preferencesDataSource.setOverriddenSessionKey(null)
+    if (!rule.enabled && wasPreviouslyActive) {
+      // Marca para garantir restauração se nenhuma outra regra estiver ativa
+      preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_${rule.id}")
+    }
     val updatedPrefs = preferencesDataSource.prefsFlow.first()
     onRescheduleRuleAlarms(updatedPrefs.scheduleRules)
     evaluateAndApplyRules(source = TransitionTriggerSource.SCHEDULE)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
   override suspend fun deleteScheduleRule(ruleId: String): Result<Unit> = runCatching {
+    val prevPrefs = preferencesDataSource.prefsFlow.first()
+    val wasPreviouslyActive = prevPrefs.lastAppliedRuleSessionKey?.contains(ruleId) == true
     preferencesDataSource.deleteScheduleRule(ruleId)
+    preferencesDataSource.setOverriddenSessionKey(null)
+    if (wasPreviouslyActive) {
+      preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_$ruleId")
+    }
     val updatedPrefs = preferencesDataSource.prefsFlow.first()
     onRescheduleRuleAlarms(updatedPrefs.scheduleRules)
     evaluateAndApplyRules(source = TransitionTriggerSource.SCHEDULE)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
   override suspend fun upsertLocationRule(rule: LocationRule): Result<Unit> = runCatching {
+    val prevPrefs = preferencesDataSource.prefsFlow.first()
+    val wasPreviouslyActive = prevPrefs.lastAppliedRuleSessionKey?.contains(rule.id) == true
     preferencesDataSource.upsertLocationRule(rule)
+    preferencesDataSource.setOverriddenSessionKey(null)
+    if ((!rule.enabled || !rule.isCurrentlyInside) && wasPreviouslyActive) {
+      preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_${rule.id}")
+    }
     evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
   override suspend fun deleteLocationRule(ruleId: String): Result<Unit> = runCatching {
+    val prevPrefs = preferencesDataSource.prefsFlow.first()
+    val wasPreviouslyActive = prevPrefs.lastAppliedRuleSessionKey?.contains(ruleId) == true
     preferencesDataSource.deleteLocationRule(ruleId)
+    preferencesDataSource.setOverriddenSessionKey(null)
+    if (wasPreviouslyActive) {
+      preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_$ruleId")
+    }
     evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
@@ -415,17 +455,33 @@ class DefaultSoundModeRepository(
     val target = prefs.locationRules.firstOrNull { it.id == ruleId } ?: return@runCatching
     val updated = target.copy(isCurrentlyInside = inside)
     preferencesDataSource.upsertLocationRule(updated)
+    preferencesDataSource.setOverriddenSessionKey(null)
+    if (!inside && prefs.lastAppliedRuleSessionKey?.contains(ruleId) == true) {
+      preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_$ruleId")
+    }
     evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
   override suspend fun setRestorePolicy(policy: RestorePolicy): Result<Unit> = runCatching {
     preferencesDataSource.setRestorePolicy(policy)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
   override suspend fun setDefaultDayProfileId(profileId: String): Result<Unit> = runCatching {
     preferencesDataSource.setDefaultDayProfileId(profileId)
+    val prefs = preferencesDataSource.prefsFlow.first()
+    if (prefs.activeTimer == null && prefs.lastAppliedRuleSessionKey == null) {
+      val allProfiles = mergeProfiles(prefs.customProfiles)
+      val selectedDefault = allProfiles.firstOrNull { it.id == profileId }
+      if (selectedDefault != null) {
+        applyProfileToSystem(selectedDefault)
+        preferencesDataSource.setActiveProfileId(selectedDefault.id)
+      }
+    }
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
@@ -446,11 +502,15 @@ class DefaultSoundModeRepository(
 
   override suspend fun setMuteMediaOnSilent(enabled: Boolean): Result<Unit> = runCatching {
     preferencesDataSource.setMuteMediaOnSilent(enabled)
+    syncMediaProtectionNow()
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
   override suspend fun setPreserveMediaOnBluetooth(enabled: Boolean): Result<Unit> = runCatching {
     preferencesDataSource.setPreserveMediaOnBluetooth(enabled)
+    syncMediaProtectionNow()
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
@@ -656,6 +716,23 @@ class DefaultSoundModeRepository(
 
     onRefreshExternalSurfaces()
     refreshSystemState()
+  }
+
+  private suspend fun syncMediaProtectionNow() {
+    val currentMode = systemController.readCurrentMode()
+    if (currentMode == SoundMode.NORMAL) return
+    val prefs = preferencesDataSource.prefsFlow.first()
+    val streams = systemController.readVolumeStreams()
+    val skipBt = prefs.preserveMediaOnBluetooth && systemController.isBluetoothHeadsetConnected()
+    val shouldMute = prefs.muteMediaOnSilent && !skipBt
+
+    if (shouldMute && streams.mediaPercent > 0) {
+      preferencesDataSource.setSavedMediaBeforeMute(streams.mediaPercent)
+      systemController.applyStreamVolume(VolumeStreamType.MEDIA, 0)
+    } else if (!shouldMute && streams.mediaPercent == 0 && prefs.savedMediaBeforeMute != null) {
+      systemController.applyStreamVolume(VolumeStreamType.MEDIA, prefs.savedMediaBeforeMute)
+      preferencesDataSource.setSavedMediaBeforeMute(null)
+    }
   }
 
   private fun applyProfileToSystem(profile: SoundProfile): Result<Unit> = runCatching {

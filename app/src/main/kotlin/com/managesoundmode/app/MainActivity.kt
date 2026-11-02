@@ -8,9 +8,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.managesoundmode.app.data.local.PersistedSoundPrefs
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.TransitionTriggerSource
 import com.managesoundmode.app.system.AppShortcutsManager
@@ -24,9 +27,16 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     handleShortcutIntent(intent)
 
+    val app = applicationContext as ManageSoundApplication
     enableEdgeToEdge()
     setContent {
-      ManageSoundModeTheme {
+      val prefs by app.container.preferencesDataSource.prefsFlow.collectAsStateWithLifecycle(
+        initialValue = PersistedSoundPrefs(),
+      )
+      ManageSoundModeTheme(
+        themeMode = prefs.themeMode,
+        dynamicColor = prefs.useDynamicColor,
+      ) {
         Surface(
           modifier = Modifier.fillMaxSize(),
           color = MaterialTheme.colorScheme.background,
