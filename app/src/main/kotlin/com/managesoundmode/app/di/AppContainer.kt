@@ -9,11 +9,13 @@ import com.managesoundmode.app.data.repository.DefaultSoundModeRepository
 import com.managesoundmode.app.data.repository.SoundModeRepository
 import com.managesoundmode.app.data.system.AndroidSoundSystemController
 import com.managesoundmode.app.data.system.SoundSystemController
+import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.system.ExactRuleAlarmScheduler
 import com.managesoundmode.app.system.SmartNotificationManager
 import com.managesoundmode.app.tile.SoundModeTileService
 import com.managesoundmode.app.widget.SoundModeGlanceWidget
 import com.managesoundmode.app.work.RestoreSoundModeWorker
+import kotlinx.coroutines.flow.first
 
 interface AppContainer {
   val soundSystemController: SoundSystemController
@@ -60,6 +62,21 @@ class DefaultAppContainer(
       },
       onRefreshExternalSurfaces = {
         SoundModeGlanceWidget.refreshAllWidgets(appContext)
+        runCatching {
+          val prefs = preferencesDataSource.prefsFlow.first()
+          val allProfiles = SoundProfile.defaultPresets + prefs.customProfiles
+          val activeProfileName = prefs.activeProfileId?.let { activeId ->
+            allProfiles.lastOrNull { it.id == activeId }?.name
+          }
+          SmartNotificationManager.syncPersistentQuickBarNotification(
+            context = appContext,
+            enabled = prefs.persistentQuickBarEnabled,
+            currentMode = soundSystemController.readCurrentMode(),
+            streams = soundSystemController.readVolumeStreams(),
+            activeProfileName = activeProfileName,
+            activeTimer = prefs.activeTimer,
+          )
+        }
         runCatching {
           TileService.requestListeningState(
             appContext,

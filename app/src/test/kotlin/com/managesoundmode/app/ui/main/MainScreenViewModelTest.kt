@@ -295,6 +295,34 @@ class MainScreenViewModelTest {
     val afterResume = viewModel.uiState.value as MainScreenUiState.Ready
     assertEquals(65, afterResume.streams.mediaPercent)
   }
+
+  @Test
+  fun onSetPersistentQuickBarEnabled_updatesPreferenceAndTriggersRefresh() = runTest {
+    var surfaceRefreshCount = 0
+    val repoWithSurfaceRefresh = DefaultSoundModeRepository(
+      systemController = fakeSystemController,
+      preferencesDataSource = fakePreferences,
+      onRefreshExternalSurfaces = { surfaceRefreshCount++ },
+    )
+    val vm = MainScreenViewModel(repoWithSurfaceRefresh)
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      vm.uiState.collect()
+    }
+
+    assertTrue((vm.uiState.value as MainScreenUiState.Ready).persistentQuickBarEnabled)
+
+    vm.onSetPersistentQuickBarEnabled(false)
+    val afterDisable = vm.uiState.value as MainScreenUiState.Ready
+    assertEquals(false, afterDisable.persistentQuickBarEnabled)
+    assertEquals("Gadget removido da barra de notificações", afterDisable.statusMessage)
+    assertEquals(1, surfaceRefreshCount)
+
+    vm.onSetPersistentQuickBarEnabled(true)
+    val afterEnable = vm.uiState.value as MainScreenUiState.Ready
+    assertEquals(true, afterEnable.persistentQuickBarEnabled)
+    assertEquals("Gadget fixado na barra de notificações", afterEnable.statusMessage)
+    assertEquals(2, surfaceRefreshCount)
+  }
 }
 
 private class FakeSoundSystemController : SoundSystemController {
@@ -437,6 +465,10 @@ private class FakeSoundPreferencesDataSource : SoundPreferencesDataSource {
 
   override suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean) {
     state.value = state.value.copy(smartVolumeTriggerEnabled = enabled)
+  }
+
+  override suspend fun setPersistentQuickBarEnabled(enabled: Boolean) {
+    state.value = state.value.copy(persistentQuickBarEnabled = enabled)
   }
 
   override suspend fun setSavedMediaBeforeMute(percent: Int?) {

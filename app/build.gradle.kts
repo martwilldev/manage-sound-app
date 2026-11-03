@@ -11,18 +11,40 @@ android {
   defaultConfig {
     applicationId = "com.managesoundmode.app"
     minSdk = 29
-    targetSdk = 36
-    versionCode = 1
-    versionName = "0.1.0"
+    targetSdk = 35
+    versionCode = 2
+    versionName = "0.2.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+  }
+
+  signingConfigs {
+    getByName("debug") {
+      enableV1Signing = true
+      enableV2Signing = true
+      enableV3Signing = true
+    }
+    create("release") {
+      val keystoreFile = file("keystore/manage-sound-release.jks")
+      if (keystoreFile.exists()) {
+        storeFile = keystoreFile
+        storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: "change_me_in_production"
+        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "managesoundmode"
+        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "change_me_in_production"
+      } else {
+        initWith(getByName("debug"))
+      }
+      enableV1Signing = true
+      enableV2Signing = true
+      enableV3Signing = true
+    }
   }
 
   buildTypes {
     release {
       isMinifyEnabled = true
       isShrinkResources = true
-      signingConfig = signingConfigs.getByName("debug")
+      signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }

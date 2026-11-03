@@ -15,6 +15,7 @@ import com.managesoundmode.app.MainActivity
 import com.managesoundmode.app.R
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.TimedModeSession
+import com.managesoundmode.app.domain.model.VolumeStreams
 import com.managesoundmode.app.receiver.SystemAutomationReceiver
 
 object SmartNotificationManager {
@@ -22,10 +23,12 @@ object SmartNotificationManager {
   private const val CHANNEL_SMART_PROMPT = "smart_volume_prompt"
   private const val CHANNEL_ACTIVE_TIMER = "active_timer_status"
   private const val CHANNEL_RULE_OVERRIDE = "rule_override_alert"
+  private const val CHANNEL_PERSISTENT_QUICK_BAR = "persistent_quick_bar"
 
   private const val NOTIFICATION_ID_SMART_PROMPT = 3101
   private const val NOTIFICATION_ID_ACTIVE_TIMER = 3102
   private const val NOTIFICATION_ID_RULE_OVERRIDE = 3103
+  private const val NOTIFICATION_ID_PERSISTENT_BAR = 3104
 
   fun ensureChannels(context: Context) {
     val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -60,7 +63,91 @@ object SmartNotificationManager {
       enableVibration(false)
     }
 
-    manager.createNotificationChannels(listOf(promptChannel, timerChannel, overrideChannel))
+    val quickBarChannel = NotificationChannel(
+      CHANNEL_PERSISTENT_QUICK_BAR,
+      "Gadget de Controle Rápido no Header",
+      NotificationManager.IMPORTANCE_LOW,
+    ).apply {
+      description = "Barra rápida persistente na gaveta de notificações para alternar Som, Vibrar e Silêncio em 1 toque"
+      setSound(null, null)
+      enableVibration(false)
+      setShowBadge(false)
+    }
+
+    manager.createNotificationChannels(
+      listOf(promptChannel, timerChannel, overrideChannel, quickBarChannel),
+    )
+  }
+
+  fun syncPersistentQuickBarNotification(
+    context: Context,
+    enabled: Boolean,
+    currentMode: SoundMode,
+    streams: VolumeStreams,
+    activeProfileName: String?,
+    activeTimer: TimedModeSession?,
+  ) {
+    val manager = NotificationManagerCompat.from(context)
+    if (!enabled || !canPostNotifications(context)) {
+      manager.cancel(NOTIFICATION_ID_PERSISTENT_BAR)
+      return
+    }
+
+    ensureChannels(context)
+    val now = System.currentTimeMillis()
+    val remainingMin = activeTimer?.remainingMinutes(now)?.takeIf { it > 0 }
+
+    val title = when {
+      remainingMin != null -> "${currentMode.title} • Timer (${remainingMin}m restantes)"
+      !activeProfileName.isNullOrBlank() -> "${currentMode.title} • Perfil $activeProfileName"
+      else -> "Modo Atual: ${currentMode.title}"
+    }
+
+    val subtitle = when (currentMode) {
+      SoundMode.NORMAL ->
+        "Toque ${streams.ringPercent}% • Notif ${streams.notificationPercent}% • Mídia ${streams.mediaPercent}%"
+      SoundMode.VIBRATE ->
+        "Vibração ativa • Mídia ${streams.mediaPercent}% • Alarme ${streams.alarmPercent}%"
+      SoundMode.SILENT ->
+        "Silêncio total • Mídia ${streams.mediaPercent}% • Alarme ${streams.alarmPercent}%"
+    }
+
+    val smallIconRes = when (currentMode) {
+      SoundMode.NORMAL -> R.drawable.ic_widget_volume_up
+      SoundMode.VIBRATE -> R.drawable.ic_widget_vibration
+      SoundMode.SILENT -> R.drawable.ic_widget_silent
+    }
+
+    val notification = NotificationCompat.Builder(context, CHANNEL_PERSISTENT_QUICK_BAR)
+      .setSmallIcon(smallIconRes)
+      .setContentTitle(title)
+      .setContentText(subtitle)
+      .setContentIntent(openAppPendingIntent(context))
+      .setOngoing(true)
+      .setOnlyAlertOnce(true)
+      .setSilent(true)
+      .setShowWhen(false)
+      .setPriority(NotificationCompat.PRIORITY_LOW)
+      .setCategory(NotificationCompat.CATEGORY_SERVICE)
+      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+      .addAction(
+        R.drawable.ic_widget_volume_up,
+        if (currentMode == SoundMode.NORMAL) "● Som" else "Som",
+        setModePendingIntent(context, requestCode = 420, mode = SoundMode.NORMAL),
+      )
+      .addAction(
+        R.drawable.ic_widget_vibration,
+        if (currentMode == SoundMode.VIBRATE) "● Vibrar" else "Vibrar",
+        setModePendingIntent(context, requestCode = 421, mode = SoundMode.VIBRATE),
+      )
+      .addAction(
+        R.drawable.ic_widget_silent,
+        if (currentMode == SoundMode.SILENT) "● Silêncio" else "Silêncio",
+        setModePendingIntent(context, requestCode = 422, mode = SoundMode.SILENT),
+      )
+      .build()
+
+    manager.notify(NOTIFICATION_ID_PERSISTENT_BAR, notification)
   }
 
   fun showSmartRestorePrompt(
@@ -203,6 +290,23 @@ object SmartNotificationManager {
     return PendingIntent.getActivity(
       context,
       400,
+      intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+  }
+
+  private fun setModePendingIntent(
+    context: Context,
+    requestCode: Int,
+    mode: SoundMode,
+  ): PendingIntent {
+    val intent = Intent(context, SystemAutomationReceiver::class.java).apply {
+      action = SystemAutomationReceiver.ACTION_WIDGET_SET_MODE
+      putExtra(SystemAutomationReceiver.EXTRA_SOUND_MODE, mode.name)
+    }
+    return PendingIntent.getBroadcast(
+      context,
+      requestCode,
       intent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )

@@ -72,6 +72,8 @@ internal fun SettingsAndProfilesTabContent(
   onRequestExactAlarmPermission: () -> Unit,
   onRequestNotificationPermission: () -> Unit,
   onClearLogs: () -> Unit,
+  onSetPersistentQuickBarEnabled: (Boolean) -> Unit = {},
+  onRequestAddQuickTile: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val restorePolicies = RestorePolicy.entries
@@ -353,9 +355,112 @@ internal fun SettingsAndProfilesTabContent(
     }
 
     item {
+      val shape = groupedCardShape(index = 0, totalCount = 3)
+      Card(
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("persistent_quick_bar_card"),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+      ) {
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(18.dp),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Icon(
+              imageVector = Icons.Default.NotificationsActive,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
+            )
+            Column {
+              Text(
+                text = "Gadget Fixo na Barra de Notificações",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+              )
+              Text(
+                text = "Exibe barra silenciosa com botões [Som] [Vibrar] [Silêncio] ao puxar as notificações",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+          M3CheckSwitch(
+            checked = state.persistentQuickBarEnabled,
+            onCheckedChange = onSetPersistentQuickBarEnabled,
+            modifier = Modifier.testTag("persistent_quick_bar_switch"),
+          )
+        }
+      }
+    }
+
+    item {
+      val shape = groupedCardShape(index = 1, totalCount = 3)
+      Card(
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("quick_settings_tile_card"),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(18.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Icon(
+              imageVector = Icons.Default.SettingsBrightness,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "Bloco no Header das Notificações (Tile)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+              )
+              Text(
+                text = "Adicione o bloco 'Modo de Som' ao lado de Wi-Fi, Bluetooth e Lanterna no topo do Android.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+          FilledTonalButton(
+            onClick = onRequestAddQuickTile,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+              .align(Alignment.End)
+              .testTag("add_quick_tile_button"),
+          ) {
+            Text("Adicionar no Topo das Notificações")
+          }
+        }
+      }
+    }
+
+    item {
+      val shape = groupedCardShape(index = 2, totalCount = 3)
       Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = shape,
         colors = CardDefaults.cardColors(
           containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -391,7 +496,9 @@ internal fun SettingsAndProfilesTabContent(
           FilledTonalButton(
             onClick = onPinHomeWidget,
             shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.align(Alignment.End),
+            modifier = Modifier
+              .align(Alignment.End)
+              .testTag("pin_home_widget_button"),
           ) {
             Text("Fixar Widget na Tela Inicial")
           }

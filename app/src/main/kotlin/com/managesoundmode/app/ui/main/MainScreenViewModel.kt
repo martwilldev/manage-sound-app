@@ -59,6 +59,7 @@ sealed interface MainScreenUiState {
     val muteMediaOnSilent: Boolean = true,
     val preserveMediaOnBluetooth: Boolean = true,
     val smartVolumeTriggerEnabled: Boolean = true,
+    val persistentQuickBarEnabled: Boolean = true,
   ) : MainScreenUiState
 
   data class Error(val message: String) : MainScreenUiState
@@ -104,6 +105,7 @@ class MainScreenViewModel(
       muteMediaOnSilent = prefs.muteMediaOnSilent,
       preserveMediaOnBluetooth = prefs.preserveMediaOnBluetooth,
       smartVolumeTriggerEnabled = prefs.smartVolumeTriggerEnabled,
+      persistentQuickBarEnabled = prefs.persistentQuickBarEnabled,
     ) as MainScreenUiState
   }
     .catch { throwable ->
@@ -365,6 +367,23 @@ class MainScreenViewModel(
     viewModelScope.launch {
       repository.setSmartVolumeTriggerEnabled(enabled)
     }
+  }
+
+  fun onSetPersistentQuickBarEnabled(enabled: Boolean) {
+    viewModelScope.launch {
+      repository.setPersistentQuickBarEnabled(enabled)
+        .onSuccess {
+          feedbackMessage.value = if (enabled) {
+            "Gadget fixado na barra de notificações"
+          } else {
+            "Gadget removido da barra de notificações"
+          }
+        }
+    }
+  }
+
+  fun onShowStatusMessage(message: String) {
+    feedbackMessage.value = message
   }
 
   fun onReapplyActiveRule() {

@@ -47,6 +47,7 @@ data class PersistedSoundPrefs(
   val muteMediaOnSilent: Boolean = true,
   val preserveMediaOnBluetooth: Boolean = true,
   val smartVolumeTriggerEnabled: Boolean = true,
+  val persistentQuickBarEnabled: Boolean = true,
   val savedMediaBeforeMute: Int? = null,
 )
 
@@ -73,6 +74,7 @@ interface SoundPreferencesDataSource {
   suspend fun setMuteMediaOnSilent(enabled: Boolean) {}
   suspend fun setPreserveMediaOnBluetooth(enabled: Boolean) {}
   suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean) {}
+  suspend fun setPersistentQuickBarEnabled(enabled: Boolean) {}
   suspend fun setSavedMediaBeforeMute(percent: Int?) {}
 }
 
@@ -154,6 +156,7 @@ class DataStoreSoundPreferencesDataSource(
           muteMediaOnSilent = prefs[KEY_MUTE_MEDIA_ON_SILENT] ?: true,
           preserveMediaOnBluetooth = prefs[KEY_PRESERVE_MEDIA_ON_BT] ?: true,
           smartVolumeTriggerEnabled = prefs[KEY_SMART_VOLUME_TRIGGER] ?: true,
+          persistentQuickBarEnabled = prefs[KEY_PERSISTENT_QUICK_BAR] ?: true,
           savedMediaBeforeMute = prefs[KEY_SAVED_MEDIA_BEFORE_MUTE],
         )
       }
@@ -346,6 +349,12 @@ class DataStoreSoundPreferencesDataSource(
     }
   }
 
+  override suspend fun setPersistentQuickBarEnabled(enabled: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_PERSISTENT_QUICK_BAR] = enabled
+    }
+  }
+
   override suspend fun setSavedMediaBeforeMute(percent: Int?) {
     context.soundDataStore.edit { prefs ->
       if (percent == null) {
@@ -376,6 +385,7 @@ class DataStoreSoundPreferencesDataSource(
     val KEY_MUTE_MEDIA_ON_SILENT = booleanPreferencesKey("mute_media_on_silent")
     val KEY_PRESERVE_MEDIA_ON_BT = booleanPreferencesKey("preserve_media_on_bt")
     val KEY_SMART_VOLUME_TRIGGER = booleanPreferencesKey("smart_volume_trigger")
+    val KEY_PERSISTENT_QUICK_BAR = booleanPreferencesKey("persistent_quick_bar_enabled")
     val KEY_SAVED_MEDIA_BEFORE_MUTE = intPreferencesKey("saved_media_before_mute")
   }
 }

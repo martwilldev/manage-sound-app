@@ -69,6 +69,7 @@ interface SoundModeRepository {
   suspend fun setMuteMediaOnSilent(enabled: Boolean): Result<Unit>
   suspend fun setPreserveMediaOnBluetooth(enabled: Boolean): Result<Unit>
   suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean): Result<Unit>
+  suspend fun setPersistentQuickBarEnabled(enabled: Boolean): Result<Unit>
   suspend fun clearTransitionLogs(): Result<Unit>
 
   suspend fun reapplyActiveRule(): Result<Unit>
@@ -540,6 +541,12 @@ class DefaultSoundModeRepository(
     if (!enabled) {
       onDismissSmartPrompt()
     }
+    refreshSystemState()
+  }
+
+  override suspend fun setPersistentQuickBarEnabled(enabled: Boolean): Result<Unit> = runCatching {
+    preferencesDataSource.setPersistentQuickBarEnabled(enabled)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
