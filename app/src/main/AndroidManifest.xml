@@ -75,12 +75,94 @@
                 android:resource="@xml/sound_mode_widget_info" />
         </receiver>
 
-        <!-- Quick Settings Tile nativo na barra de status do Android -->
+        <!-- Quick Settings Tiles nativos no Header de Notificações do Android -->
+        <!-- 0. Bloco Alternador Único (Ciclo: Som -> Vibrar -> Silêncio) -->
         <service
             android:name=".tile.SoundModeTileService"
             android:exported="true"
             android:icon="@drawable/ic_qs_sound_mode"
-            android:label="@string/app_name"
+            android:label="@string/qs_tile_cycle_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Opção A: Trio de Modos Diretos (Som | Vibrar | Silêncio) -->
+        <service
+            android:name=".tile.NormalModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_volume_up"
+            android:label="@string/qs_tile_normal_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.VibrateModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_vibration"
+            android:label="@string/qs_tile_vibrate_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SilentModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_silent"
+            android:label="@string/qs_tile_silent_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Opção B: Slots de Perfis Favoritos (Slot 1 & Slot 2) -->
+        <service
+            android:name=".tile.ProfileSlot1TileService"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_style"
+            android:label="@string/qs_tile_profile_1_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.ProfileSlot2TileService"
+            android:exported="true"
+            android:icon="@drawable/ic_widget_style"
+            android:label="@string/qs_tile_profile_2_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Opção C: Tile de Timer Rápido (30m / 1h / 2h) -->
+        <service
+            android:name=".tile.QuickTimerTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_timer"
+            android:label="@string/qs_tile_timer_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Opção D: Tile Zero Mídia (Mudo Instantâneo de Mídia) -->
+        <service
+            android:name=".tile.MediaMuteTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_media_mute"
+            android:label="@string/qs_tile_media_mute_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

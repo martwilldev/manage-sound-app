@@ -102,6 +102,7 @@ import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.VolumeStreamType
 import com.managesoundmode.app.domain.model.VolumeStreams
 import com.managesoundmode.app.system.SmartNotificationManager
+import com.managesoundmode.app.tile.QuickTileKind
 import com.managesoundmode.app.tile.SoundModeTileService
 import com.managesoundmode.app.ui.components.PillVolumeSliderRow
 import com.managesoundmode.app.ui.components.ProfileEditorBottomSheet
@@ -259,11 +260,16 @@ fun MainScreen(
               notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
           },
-          onRequestAddQuickTile = {
-            SoundModeTileService.requestAddTile(context) { message ->
+          onRequestAddQuickTile = { kind, customLabel ->
+            SoundModeTileService.requestAddTile(
+              context = context,
+              kind = kind,
+              customLabel = customLabel,
+            ) { message ->
               viewModel.onShowStatusMessage(message)
             }
           },
+          onSetQuickTileSlotProfileId = viewModel::onSetQuickTileSlotProfileId,
           onTestSmartNotification = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !state.hasNotificationPermission) {
               notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -330,7 +336,8 @@ internal fun MainDashboardContent(
   onSetPreserveMediaOnBluetooth: (Boolean) -> Unit = {},
   onSetSmartVolumeTriggerEnabled: (Boolean) -> Unit = {},
   onSetPersistentQuickBarEnabled: (Boolean) -> Unit = {},
-  onRequestAddQuickTile: () -> Unit = {},
+  onRequestAddQuickTile: (QuickTileKind, String?) -> Unit = { _, _ -> },
+  onSetQuickTileSlotProfileId: (Int, String) -> Unit = { _, _ -> },
   onTestSmartNotification: () -> Unit = {},
   onPinHomeWidget: () -> Unit = {},
   onClearLogs: () -> Unit = {},
@@ -617,6 +624,7 @@ internal fun MainDashboardContent(
           onSetSmartVolumeTriggerEnabled = onSetSmartVolumeTriggerEnabled,
           onSetPersistentQuickBarEnabled = onSetPersistentQuickBarEnabled,
           onRequestAddQuickTile = onRequestAddQuickTile,
+          onSetQuickTileSlotProfileId = onSetQuickTileSlotProfileId,
           onTestSmartNotification = onTestSmartNotification,
           onPinHomeWidget = onPinHomeWidget,
           onRequestDndPermission = onRequestDndPermission,

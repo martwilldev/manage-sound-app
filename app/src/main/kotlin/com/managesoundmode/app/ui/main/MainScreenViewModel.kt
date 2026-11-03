@@ -60,6 +60,8 @@ sealed interface MainScreenUiState {
     val preserveMediaOnBluetooth: Boolean = true,
     val smartVolumeTriggerEnabled: Boolean = true,
     val persistentQuickBarEnabled: Boolean = true,
+    val quickTileSlot1ProfileId: String = "preset_work_high",
+    val quickTileSlot2ProfileId: String = "preset_sleep",
   ) : MainScreenUiState
 
   data class Error(val message: String) : MainScreenUiState
@@ -106,6 +108,8 @@ class MainScreenViewModel(
       preserveMediaOnBluetooth = prefs.preserveMediaOnBluetooth,
       smartVolumeTriggerEnabled = prefs.smartVolumeTriggerEnabled,
       persistentQuickBarEnabled = prefs.persistentQuickBarEnabled,
+      quickTileSlot1ProfileId = prefs.quickTileSlot1ProfileId,
+      quickTileSlot2ProfileId = prefs.quickTileSlot2ProfileId,
     ) as MainScreenUiState
   }
     .catch { throwable ->
@@ -378,6 +382,17 @@ class MainScreenViewModel(
           } else {
             "Gadget removido da barra de notificações"
           }
+        }
+    }
+  }
+
+  fun onSetQuickTileSlotProfileId(slotIndex: Int, profileId: String) {
+    viewModelScope.launch {
+      repository.setQuickTileSlotProfileId(slotIndex, profileId)
+        .onSuccess {
+          val profiles = (uiState.value as? MainScreenUiState.Ready)?.profiles
+          val name = profiles?.firstOrNull { it.id == profileId }?.name ?: "Perfil"
+          feedbackMessage.value = "Bloco de Perfil $slotIndex vinculado a '$name'"
         }
     }
   }

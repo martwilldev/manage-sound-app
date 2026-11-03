@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
@@ -25,15 +28,20 @@ import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SettingsBrightness
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -46,10 +54,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.managesoundmode.app.domain.model.RestorePolicy
+import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.domain.model.ThemeMode
 import com.managesoundmode.app.domain.model.TransitionLogEntry
+import com.managesoundmode.app.tile.QuickTileKind
 import com.managesoundmode.app.ui.components.M3CheckSwitch
 import com.managesoundmode.app.ui.components.groupedCardShape
 import java.text.SimpleDateFormat
@@ -73,7 +84,8 @@ internal fun SettingsAndProfilesTabContent(
   onRequestNotificationPermission: () -> Unit,
   onClearLogs: () -> Unit,
   onSetPersistentQuickBarEnabled: (Boolean) -> Unit = {},
-  onRequestAddQuickTile: () -> Unit = {},
+  onRequestAddQuickTile: (QuickTileKind, String?) -> Unit = { _, _ -> },
+  onSetQuickTileSlotProfileId: (Int, String) -> Unit = { _, _ -> },
   modifier: Modifier = Modifier,
 ) {
   val restorePolicies = RestorePolicy.entries
@@ -354,8 +366,9 @@ internal fun SettingsAndProfilesTabContent(
       SectionHeader(title = "Widgets & Gadgets do Sistema")
     }
 
+    // 3.1 Barra Rápida Persistente na Gaveta de Notificações
     item {
-      val shape = groupedCardShape(index = 0, totalCount = 3)
+      val shape = groupedCardShape(index = 0, totalCount = 5)
       Card(
         modifier = Modifier
           .fillMaxWidth()
@@ -404,8 +417,9 @@ internal fun SettingsAndProfilesTabContent(
       }
     }
 
+    // 3.2 Opção A — Trio de Modos Diretos no Header (Som | Vibrar | Silêncio) + Bloco Ciclo
     item {
-      val shape = groupedCardShape(index = 1, totalCount = 3)
+      val shape = groupedCardShape(index = 1, totalCount = 5)
       Card(
         modifier = Modifier
           .fillMaxWidth()
@@ -432,32 +446,222 @@ internal fun SettingsAndProfilesTabContent(
             )
             Column(modifier = Modifier.weight(1f)) {
               Text(
-                text = "Bloco no Header das Notificações (Tile)",
+                text = "Blocos de Modo no Header (Trio ou Ciclo)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
               )
               Text(
-                text = "Adicione o bloco 'Modo de Som' ao lado de Wi-Fi, Bluetooth e Lanterna no topo do Android.",
+                text = "Adicione os 3 blocos independentes (apenas o modo atual fica colorido no topo e qualquer troca leva 1 toque) ou o bloco único de ciclo.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
             }
           }
-          FilledTonalButton(
-            onClick = onRequestAddQuickTile,
-            shape = RoundedCornerShape(16.dp),
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            FilledTonalButton(
+              onClick = { onRequestAddQuickTile(QuickTileKind.MODE_NORMAL, null) },
+              shape = RoundedCornerShape(14.dp),
+              contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+              modifier = Modifier
+                .weight(1f)
+                .testTag("add_tile_normal"),
+            ) {
+              Text("+ Som", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            FilledTonalButton(
+              onClick = { onRequestAddQuickTile(QuickTileKind.MODE_VIBRATE, null) },
+              shape = RoundedCornerShape(14.dp),
+              contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+              modifier = Modifier
+                .weight(1f)
+                .testTag("add_tile_vibrate"),
+            ) {
+              Text("+ Vibrar", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            FilledTonalButton(
+              onClick = { onRequestAddQuickTile(QuickTileKind.MODE_SILENT, null) },
+              shape = RoundedCornerShape(14.dp),
+              contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+              modifier = Modifier
+                .weight(1f)
+                .testTag("add_tile_silent"),
+            ) {
+              Text("+ Silêncio", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+          }
+
+          OutlinedButton(
+            onClick = { onRequestAddQuickTile(QuickTileKind.CYCLE, null) },
+            shape = RoundedCornerShape(14.dp),
             modifier = Modifier
-              .align(Alignment.End)
+              .fillMaxWidth()
               .testTag("add_quick_tile_button"),
           ) {
-            Text("Adicionar no Topo das Notificações")
+            Icon(
+              imageVector = Icons.Default.Add,
+              contentDescription = null,
+              modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.size(6.dp))
+            Text("Adicionar Bloco Único (Ciclo: Som → Vibrar → Silêncio)")
           }
         }
       }
     }
 
+    // 3.3 Opção B — Slots de Perfis Favoritos no Header (Slot 1 e Slot 2)
     item {
-      val shape = groupedCardShape(index = 2, totalCount = 3)
+      val shape = groupedCardShape(index = 2, totalCount = 5)
+      val slot1Profile = state.profiles.firstOrNull { it.id == state.quickTileSlot1ProfileId }
+        ?: state.profiles.firstOrNull()
+      val slot2Profile = state.profiles.firstOrNull { it.id == state.quickTileSlot2ProfileId }
+        ?: state.profiles.getOrNull(1)
+        ?: state.profiles.firstOrNull()
+
+      Card(
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("quick_profile_tiles_card"),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(18.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Icon(
+              imageVector = Icons.Default.Style,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "Blocos de Perfis Favoritos no Header",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+              )
+              Text(
+                text = "Escolha até 2 perfis para acionar no topo do Android aplicando os 4 canais de volume em 1 toque.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+
+          ProfileQuickTileSlotConfigRow(
+            slotNumber = 1,
+            profiles = state.profiles,
+            selectedProfile = slot1Profile,
+            onSelectProfile = { profileId -> onSetQuickTileSlotProfileId(1, profileId) },
+            onAddTile = {
+              onRequestAddQuickTile(
+                QuickTileKind.PROFILE_SLOT_1,
+                slot1Profile?.name ?: "Perfil Rápido 1",
+              )
+            },
+          )
+
+          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+          ProfileQuickTileSlotConfigRow(
+            slotNumber = 2,
+            profiles = state.profiles,
+            selectedProfile = slot2Profile,
+            onSelectProfile = { profileId -> onSetQuickTileSlotProfileId(2, profileId) },
+            onAddTile = {
+              onRequestAddQuickTile(
+                QuickTileKind.PROFILE_SLOT_2,
+                slot2Profile?.name ?: "Perfil Rápido 2",
+              )
+            },
+          )
+        }
+      }
+    }
+
+    // 3.4 Opções C & D — Blocos de Timer Rápido (30m/1h/2h) e Zero Mídia (Mudo 0%)
+    item {
+      val shape = groupedCardShape(index = 3, totalCount = 5)
+      Card(
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("quick_utility_tiles_card"),
+        shape = shape,
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(18.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+          ) {
+            Icon(
+              imageVector = Icons.Default.Schedule,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.primary,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "Blocos de Timer Rápido & Zero Mídia",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+              )
+              Text(
+                text = "Atalhos de 1 toque no Header para iniciar Timer de Silêncio (30m/1h/2h) ou zerar a Mídia (0%) antes de abrir vídeos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            FilledTonalButton(
+              onClick = { onRequestAddQuickTile(QuickTileKind.QUICK_TIMER, null) },
+              shape = RoundedCornerShape(14.dp),
+              modifier = Modifier
+                .weight(1f)
+                .testTag("add_tile_timer"),
+            ) {
+              Text("+ Timer (30m/1h)", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            FilledTonalButton(
+              onClick = { onRequestAddQuickTile(QuickTileKind.MEDIA_MUTE, null) },
+              shape = RoundedCornerShape(14.dp),
+              modifier = Modifier
+                .weight(1f)
+                .testTag("add_tile_media_mute"),
+            ) {
+              Text("+ Zero Mídia (0%)", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+          }
+        }
+      }
+    }
+
+    // 3.5 Widget Material You na Tela Inicial (2x1, 4x1 e 4x2)
+    item {
+      val shape = groupedCardShape(index = 4, totalCount = 5)
       Card(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
@@ -796,6 +1000,67 @@ private fun TransitionLogCard(
           text = log.detail,
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun ProfileQuickTileSlotConfigRow(
+  slotNumber: Int,
+  profiles: List<SoundProfile>,
+  selectedProfile: SoundProfile?,
+  onSelectProfile: (String) -> Unit,
+  onAddTile: () -> Unit,
+) {
+  Column(
+    modifier = Modifier.fillMaxWidth(),
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = "Slot $slotNumber: ${selectedProfile?.name ?: "Nenhum"}",
+          style = MaterialTheme.typography.bodyMedium,
+          fontWeight = FontWeight.SemiBold,
+        )
+        if (selectedProfile != null) {
+          Text(
+            text = selectedProfile.summaryLabel(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+      }
+      FilledTonalButton(
+        onClick = onAddTile,
+        shape = RoundedCornerShape(14.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        modifier = Modifier.testTag("add_tile_profile_slot_$slotNumber"),
+      ) {
+        Text("+ Adicionar Slot $slotNumber")
+      }
+    }
+
+    LazyRow(
+      horizontalArrangement = Arrangement.spacedBy(6.dp),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      items(
+        items = profiles,
+        key = { it.id },
+      ) { profile ->
+        val isSelected = selectedProfile?.id == profile.id
+        FilterChip(
+          selected = isSelected,
+          onClick = { onSelectProfile(profile.id) },
+          label = { Text(profile.name) },
+          modifier = Modifier.testTag("slot_${slotNumber}_profile_${profile.id}"),
         )
       }
     }

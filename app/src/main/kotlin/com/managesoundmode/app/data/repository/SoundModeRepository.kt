@@ -70,6 +70,8 @@ interface SoundModeRepository {
   suspend fun setPreserveMediaOnBluetooth(enabled: Boolean): Result<Unit>
   suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean): Result<Unit>
   suspend fun setPersistentQuickBarEnabled(enabled: Boolean): Result<Unit>
+  suspend fun setQuickTileSlotProfileId(slotIndex: Int, profileId: String): Result<Unit>
+  suspend fun toggleQuickMediaMute(): Result<Int>
   suspend fun clearTransitionLogs(): Result<Unit>
 
   suspend fun reapplyActiveRule(): Result<Unit>
@@ -548,6 +550,39 @@ class DefaultSoundModeRepository(
     preferencesDataSource.setPersistentQuickBarEnabled(enabled)
     onRefreshExternalSurfaces()
     refreshSystemState()
+  }
+
+  override suspend fun setQuickTileSlotProfileId(slotIndex: Int, profileId: String): Result<Unit> = runCatching {
+    if (slotIndex == 1) {
+      preferencesDataSource.setQuickTileSlot1ProfileId(profileId)
+    } else {
+      preferencesDataSource.setQuickTileSlot2ProfileId(profileId)
+    }
+    onRefreshExternalSurfaces()
+    refreshSystemState()
+  }
+
+  override suspend fun toggleQuickMediaMute(): Result<Int> = runCatching {
+    val currentStreams = systemController.readVolumeStreams()
+    val prefs = preferencesDataSource.prefsFlow.first()
+    val targetPercent = if (currentStreams.mediaPercent > 0) {
+      preferencesDataSource.setSavedMediaBeforeMute(currentStreams.mediaPercent)
+      0
+    } else {
+      val restored = (prefs.savedMediaBeforeMute ?: 50).coerceIn(20, 100)
+      preferencesDataSource.setSavedMediaBeforeMute(null)
+      restored
+    }
+    systemController.applyStreamVolume(VolumeStreamType.MEDIA, targetPercent).getOrThrow()
+    logTransition(
+      title = if (targetPercent == 0) "Mídia zerada (0%)" else "Mídia restaurada ($targetPercent%)",
+      detail = "Acionado pelo bloco Zero Mídia no Header",
+      source = TransitionTriggerSource.QUICK_TILE,
+      mode = systemController.readCurrentMode(),
+    )
+    onRefreshExternalSurfaces()
+    refreshSystemState()
+    targetPercent
   }
 
   override suspend fun clearTransitionLogs(): Result<Unit> = runCatching {

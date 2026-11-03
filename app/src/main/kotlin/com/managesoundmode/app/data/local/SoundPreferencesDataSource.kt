@@ -48,6 +48,8 @@ data class PersistedSoundPrefs(
   val preserveMediaOnBluetooth: Boolean = true,
   val smartVolumeTriggerEnabled: Boolean = true,
   val persistentQuickBarEnabled: Boolean = true,
+  val quickTileSlot1ProfileId: String = "preset_work_high",
+  val quickTileSlot2ProfileId: String = "preset_sleep",
   val savedMediaBeforeMute: Int? = null,
 )
 
@@ -75,6 +77,8 @@ interface SoundPreferencesDataSource {
   suspend fun setPreserveMediaOnBluetooth(enabled: Boolean) {}
   suspend fun setSmartVolumeTriggerEnabled(enabled: Boolean) {}
   suspend fun setPersistentQuickBarEnabled(enabled: Boolean) {}
+  suspend fun setQuickTileSlot1ProfileId(profileId: String) {}
+  suspend fun setQuickTileSlot2ProfileId(profileId: String) {}
   suspend fun setSavedMediaBeforeMute(percent: Int?) {}
 }
 
@@ -157,6 +161,8 @@ class DataStoreSoundPreferencesDataSource(
           preserveMediaOnBluetooth = prefs[KEY_PRESERVE_MEDIA_ON_BT] ?: true,
           smartVolumeTriggerEnabled = prefs[KEY_SMART_VOLUME_TRIGGER] ?: true,
           persistentQuickBarEnabled = prefs[KEY_PERSISTENT_QUICK_BAR] ?: true,
+          quickTileSlot1ProfileId = prefs[KEY_QUICK_TILE_SLOT1_PROFILE_ID] ?: "preset_work_high",
+          quickTileSlot2ProfileId = prefs[KEY_QUICK_TILE_SLOT2_PROFILE_ID] ?: "preset_sleep",
           savedMediaBeforeMute = prefs[KEY_SAVED_MEDIA_BEFORE_MUTE],
         )
       }
@@ -355,6 +361,18 @@ class DataStoreSoundPreferencesDataSource(
     }
   }
 
+  override suspend fun setQuickTileSlot1ProfileId(profileId: String) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_QUICK_TILE_SLOT1_PROFILE_ID] = profileId
+    }
+  }
+
+  override suspend fun setQuickTileSlot2ProfileId(profileId: String) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_QUICK_TILE_SLOT2_PROFILE_ID] = profileId
+    }
+  }
+
   override suspend fun setSavedMediaBeforeMute(percent: Int?) {
     context.soundDataStore.edit { prefs ->
       if (percent == null) {
@@ -386,6 +404,8 @@ class DataStoreSoundPreferencesDataSource(
     val KEY_PRESERVE_MEDIA_ON_BT = booleanPreferencesKey("preserve_media_on_bt")
     val KEY_SMART_VOLUME_TRIGGER = booleanPreferencesKey("smart_volume_trigger")
     val KEY_PERSISTENT_QUICK_BAR = booleanPreferencesKey("persistent_quick_bar_enabled")
+    val KEY_QUICK_TILE_SLOT1_PROFILE_ID = stringPreferencesKey("quick_tile_slot1_profile_id")
+    val KEY_QUICK_TILE_SLOT2_PROFILE_ID = stringPreferencesKey("quick_tile_slot2_profile_id")
     val KEY_SAVED_MEDIA_BEFORE_MUTE = intPreferencesKey("saved_media_before_mute")
   }
 }

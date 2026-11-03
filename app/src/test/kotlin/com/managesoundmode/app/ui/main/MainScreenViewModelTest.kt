@@ -323,6 +323,31 @@ class MainScreenViewModelTest {
     assertEquals("Gadget fixado na barra de notificações", afterEnable.statusMessage)
     assertEquals(2, surfaceRefreshCount)
   }
+
+  @Test
+  fun onSetQuickTileSlotProfileId_andToggleQuickMediaMute_workCorrectly() = runTest {
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    viewModel.onSetQuickTileSlotProfileId(1, "preset_home")
+    viewModel.onSetQuickTileSlotProfileId(2, "preset_meeting")
+
+    val readyAfterSlots = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals("preset_home", readyAfterSlots.quickTileSlot1ProfileId)
+    assertEquals("preset_meeting", readyAfterSlots.quickTileSlot2ProfileId)
+
+    // Media starts at 50%; toggleQuickMediaMute should mute to 0% and save 50%
+    viewModel.onStreamVolumeChange(VolumeStreamType.MEDIA, 64)
+    val mutedPercent = repository.toggleQuickMediaMute().getOrThrow()
+    assertEquals(0, mutedPercent)
+    assertEquals(0, (viewModel.uiState.value as MainScreenUiState.Ready).streams.mediaPercent)
+
+    // Second toggle should restore back to 64%
+    val restoredPercent = repository.toggleQuickMediaMute().getOrThrow()
+    assertEquals(64, restoredPercent)
+    assertEquals(64, (viewModel.uiState.value as MainScreenUiState.Ready).streams.mediaPercent)
+  }
 }
 
 private class FakeSoundSystemController : SoundSystemController {
@@ -469,6 +494,14 @@ private class FakeSoundPreferencesDataSource : SoundPreferencesDataSource {
 
   override suspend fun setPersistentQuickBarEnabled(enabled: Boolean) {
     state.value = state.value.copy(persistentQuickBarEnabled = enabled)
+  }
+
+  override suspend fun setQuickTileSlot1ProfileId(profileId: String) {
+    state.value = state.value.copy(quickTileSlot1ProfileId = profileId)
+  }
+
+  override suspend fun setQuickTileSlot2ProfileId(profileId: String) {
+    state.value = state.value.copy(quickTileSlot2ProfileId = profileId)
   }
 
   override suspend fun setSavedMediaBeforeMute(percent: Int?) {

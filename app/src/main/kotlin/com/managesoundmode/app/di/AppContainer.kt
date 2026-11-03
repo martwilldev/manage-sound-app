@@ -78,10 +78,7 @@ class DefaultAppContainer(
           )
         }
         runCatching {
-          TileService.requestListeningState(
-            appContext,
-            ComponentName(appContext, SoundModeTileService::class.java),
-          )
+          SoundModeTileService.refreshAllTiles(appContext)
         }
       },
     )
