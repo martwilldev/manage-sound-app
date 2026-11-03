@@ -20,6 +20,7 @@ import com.managesoundmode.app.domain.model.VolumeStreamType
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -94,6 +95,7 @@ class DefaultSoundModeRepository(
 ) : SoundModeRepository {
 
   private val manualRefreshTrigger = MutableStateFlow(0L)
+  private val lastObservedMode = AtomicReference(systemController.readCurrentMode())
 
   override val preferencesStream: Flow<PersistedSoundPrefs> = preferencesDataSource.prefsFlow
 
@@ -185,6 +187,7 @@ class DefaultSoundModeRepository(
     val currentMedia = systemController.readVolumeStreams().mediaPercent
 
     return systemController.applySoundMode(mode).map {
+      lastObservedMode.set(mode)
       if (mode != SoundMode.NORMAL) {
         val skipBt = prefs.preserveMediaOnBluetooth && systemController.isBluetoothHeadsetConnected()
         if (prefs.muteMediaOnSilent && !skipBt && currentMedia > 0) {
@@ -214,13 +217,20 @@ class DefaultSoundModeRepository(
   }
 
   override suspend fun setStreamVolume(type: VolumeStreamType, percent: Int): Result<Unit> {
+    val modeBefore = systemController.readCurrentMode()
     if ((type == VolumeStreamType.RING || type == VolumeStreamType.NOTIFICATION) &&
       percent > 0 &&
-      systemController.readCurrentMode() != SoundMode.NORMAL
+      modeBefore != SoundMode.NORMAL &&
+      (modeBefore != SoundMode.SILENT || systemController.hasDndPermission())
     ) {
       systemController.applySoundMode(SoundMode.NORMAL)
+      lastObservedMode.set(SoundMode.NORMAL)
     }
     return systemController.applyStreamVolume(type, percent).map {
+      lastObservedMode.set(systemController.readCurrentMode())
+      if (type == VolumeStreamType.MEDIA) {
+        preferencesDataSource.setSavedMediaBeforeMute(null)
+      }
       markManualOverrideIfRuleActive()
       preferencesDataSource.setActiveProfileId(null)
       onRefreshExternalSurfaces()
@@ -233,6 +243,7 @@ class DefaultSoundModeRepository(
     source: TransitionTriggerSource,
   ): Result<Unit> {
     return applyProfileToSystem(profile).map {
+      lastObservedMode.set(profile.mode)
       if (source == TransitionTriggerSource.MANUAL) {
         markManualOverrideIfRuleActive()
       }
@@ -258,6 +269,7 @@ class DefaultSoundModeRepository(
     val prefs = preferencesDataSource.prefsFlow.first()
 
     return systemController.applySoundMode(targetMode).map {
+      lastObservedMode.set(targetMode)
       if (targetMode != SoundMode.NORMAL && prefs.muteMediaOnSilent) {
         val skipBt = prefs.preserveMediaOnBluetooth && systemController.isBluetoothHeadsetConnected()
         if (!skipBt && previousStreams.mediaPercent > 0) {
@@ -331,6 +343,7 @@ class DefaultSoundModeRepository(
 
     val restoreMode = savedTimer?.previousMode ?: SoundMode.NORMAL
     systemController.applySoundMode(restoreMode).getOrThrow()
+    lastObservedMode.set(restoreMode)
     if (savedTimer != null && restoreMode == SoundMode.NORMAL) {
       systemController.applyAllStreams(savedTimer.previousStreams)
     }
@@ -380,6 +393,7 @@ class DefaultSoundModeRepository(
     if (applyImmediately || prefsBefore.activeProfileId == normalized.id) {
       activateProfile(normalized, source = TransitionTriggerSource.MANUAL).getOrThrow()
     } else {
+      preferencesDataSource.setLastAppliedRuleSessionKey(null)
       evaluateAndApplyRules(source = TransitionTriggerSource.MANUAL)
       onRefreshExternalSurfaces()
       refreshSystemState()
@@ -401,6 +415,8 @@ class DefaultSoundModeRepository(
     if (!rule.enabled && wasPreviouslyActive) {
       // Marca para garantir restauração se nenhuma outra regra estiver ativa
       preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_${rule.id}")
+    } else if (rule.enabled) {
+      preferencesDataSource.setLastAppliedRuleSessionKey(null)
     }
     val updatedPrefs = preferencesDataSource.prefsFlow.first()
     onRescheduleRuleAlarms(updatedPrefs.scheduleRules)
@@ -431,6 +447,8 @@ class DefaultSoundModeRepository(
     preferencesDataSource.setOverriddenSessionKey(null)
     if ((!rule.enabled || !rule.isCurrentlyInside) && wasPreviouslyActive) {
       preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_${rule.id}")
+    } else if (rule.enabled && rule.isCurrentlyInside) {
+      preferencesDataSource.setLastAppliedRuleSessionKey(null)
     }
     evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
     onRefreshExternalSurfaces()
@@ -458,6 +476,8 @@ class DefaultSoundModeRepository(
     preferencesDataSource.setOverriddenSessionKey(null)
     if (!inside && prefs.lastAppliedRuleSessionKey?.contains(ruleId) == true) {
       preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_$ruleId")
+    } else if (inside) {
+      preferencesDataSource.setLastAppliedRuleSessionKey(null)
     }
     evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
     onRefreshExternalSurfaces()
@@ -492,6 +512,7 @@ class DefaultSoundModeRepository(
 
   override suspend fun setThemeMode(mode: ThemeMode): Result<Unit> = runCatching {
     preferencesDataSource.setThemeMode(mode)
+    onRefreshExternalSurfaces()
     refreshSystemState()
   }
 
@@ -548,8 +569,8 @@ class DefaultSoundModeRepository(
     )
 
     // Se o sistema detectou que o usuário apertou o botão físico de volume durante uma regra ativa
-    if (systemController.lastBroadcastWasExternal && prefs.lastAppliedRuleSessionKey != null) {
-      preferencesDataSource.setOverriddenSessionKey(prefs.lastAppliedRuleSessionKey)
+    if (systemController.lastBroadcastWasExternal) {
+      markManualOverrideIfRuleActive()
       systemController.clearExternalBroadcastFlag()
     }
 
@@ -595,11 +616,10 @@ class DefaultSoundModeRepository(
           preferencesDataSource.setOverriddenSessionKey(null)
         }
 
-        // Aplica o perfil se ainda não for a sessão aplicada (ou se chamado explicitamente)
-        applyProfileToSystem(winner.profile).getOrThrow()
-        preferencesDataSource.setActiveProfileId(winner.profile.id)
-
+        // Aplica o perfil APENAS quando entrar na sessão pela primeira vez (jamais sobrescreve volumes no meio da sessão)
         if (updatedPrefs.lastAppliedRuleSessionKey != winner.sessionKey) {
+          applyProfileToSystem(winner.profile).getOrThrow()
+          preferencesDataSource.setActiveProfileId(winner.profile.id)
           preferencesDataSource.setLastAppliedRuleSessionKey(winner.sessionKey)
           logTransition(
             title = "Regra '${winner.ruleName}' ativada",
@@ -619,6 +639,7 @@ class DefaultSoundModeRepository(
           if (decision.restorePolicy == RestorePolicy.SNAPSHOT && decision.savedSnapshot != null) {
             val snap = decision.savedSnapshot
             systemController.applySoundMode(snap.mode).getOrThrow()
+            lastObservedMode.set(snap.mode)
             if (snap.mode == SoundMode.NORMAL) {
               systemController.applyAllStreams(snap.streams).getOrThrow()
             }
@@ -670,23 +691,20 @@ class DefaultSoundModeRepository(
 
     val prefs = preferencesDataSource.prefsFlow.first()
     val currentMode = systemController.readCurrentMode()
+    val previousMode = lastObservedMode.getAndSet(currentMode)
     val streams = systemController.readVolumeStreams()
 
-    // 1. Se havia uma regra ativa, marca como override manual pelo botão físico
-    if (prefs.lastAppliedRuleSessionKey != null && prefs.overriddenSessionKey != prefs.lastAppliedRuleSessionKey) {
-      preferencesDataSource.setOverriddenSessionKey(prefs.lastAppliedRuleSessionKey)
-      if (prefs.smartVolumeTriggerEnabled) {
-        val ruleName = prefs.scheduleRules.firstOrNull {
-          prefs.lastAppliedRuleSessionKey.contains(it.id)
-        }?.name ?: prefs.locationRules.firstOrNull {
-          prefs.lastAppliedRuleSessionKey.contains(it.id)
-        }?.name ?: "Ativa"
-        onRuleOverrideAlert(ruleName)
-      }
+    // 1. Se havia qualquer regra de horário/local ativa, marca como override manual para não sobrescrever o volume do usuário
+    val overriddenRuleName = markManualOverrideIfRuleActive()
+    if (overriddenRuleName != null && prefs.smartVolumeTriggerEnabled) {
+      onRuleOverrideAlert(overriddenRuleName)
     }
 
-    // 2. Sincronização automática de Mídia + Notificação Inteligente quando silenciado pelo botão físico
-    if (currentMode != SoundMode.NORMAL) {
+    val modeTransitionedToSilent = (previousMode == SoundMode.NORMAL && currentMode != SoundMode.NORMAL)
+    val modeTransitionedToNormal = (previousMode != SoundMode.NORMAL && currentMode == SoundMode.NORMAL)
+
+    // 2. Sincronização automática de Mídia + Notificação Inteligente APENAS quando o aparelho ACABAR DE ENTRAR em Vibrar/Silencioso
+    if (modeTransitionedToSilent) {
       var mediaAutoMuted = false
       val skipBt = prefs.preserveMediaOnBluetooth && systemController.isBluetoothHeadsetConnected()
       if (prefs.muteMediaOnSilent && !skipBt && streams.mediaPercent > 0) {
@@ -705,11 +723,22 @@ class DefaultSoundModeRepository(
         source = TransitionTriggerSource.HARDWARE_BUTTON,
         mode = currentMode,
       )
-    } else {
+    } else if (currentMode != SoundMode.NORMAL) {
+      // O aparelho JÁ estava em Vibrar/Silencioso e o usuário aumentou/alterou o volume manualmente -> respeitar 100%!
+      if (streams.mediaPercent > 0) {
+        preferencesDataSource.setSavedMediaBeforeMute(null)
+      }
+    } else if (modeTransitionedToNormal) {
+      // O aparelho acabou de voltar de Vibrar/Silencioso para Normal
       onDismissSmartPrompt()
       val savedMedia = prefs.savedMediaBeforeMute
       if (savedMedia != null && streams.mediaPercent == 0) {
         systemController.applyStreamVolume(VolumeStreamType.MEDIA, savedMedia)
+        preferencesDataSource.setSavedMediaBeforeMute(null)
+      }
+    } else {
+      // O aparelho JÁ estava em Normal e o usuário ajustou algum volume -> respeitar 100%!
+      if (streams.mediaPercent > 0 && prefs.savedMediaBeforeMute != null) {
         preferencesDataSource.setSavedMediaBeforeMute(null)
       }
     }
@@ -737,6 +766,7 @@ class DefaultSoundModeRepository(
 
   private fun applyProfileToSystem(profile: SoundProfile): Result<Unit> = runCatching {
     systemController.applySoundMode(profile.mode).getOrThrow()
+    lastObservedMode.set(profile.mode)
 
     val skipMediaBecausePlaying = profile.preserveMediaIfPlaying && systemController.isMusicActive()
     val skipMediaBecauseBt = profile.skipMediaOnBluetooth && systemController.isBluetoothHeadsetConnected()
@@ -752,7 +782,7 @@ class DefaultSoundModeRepository(
     systemController.applyStreamVolume(VolumeStreamType.ALARM, profile.streams.alarmPercent).getOrThrow()
   }
 
-  private suspend fun markManualOverrideIfRuleActive() {
+  private suspend fun markManualOverrideIfRuleActive(): String? {
     val prefs = preferencesDataSource.prefsFlow.first()
     val nowMillis = clockNowMillis()
     val nowDateTime = LocalDateTime.ofInstant(
@@ -773,9 +803,14 @@ class DefaultSoundModeRepository(
       savedSnapshot = prefs.savedSnapshot,
     )
     if (decision is RuleEvaluationDecision.ApplyRule) {
+      val wasAlreadyOverridden = prefs.overriddenSessionKey == decision.winner.sessionKey
       preferencesDataSource.setLastAppliedRuleSessionKey(decision.winner.sessionKey)
       preferencesDataSource.setOverriddenSessionKey(decision.winner.sessionKey)
+      if (!wasAlreadyOverridden) {
+        return decision.winner.ruleName
+      }
     }
+    return null
   }
 
   private suspend fun logTransition(

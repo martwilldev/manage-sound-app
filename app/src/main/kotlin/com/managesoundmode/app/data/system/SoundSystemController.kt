@@ -236,7 +236,14 @@ class AndroidSoundSystemController(
   private fun setStreamPercent(manager: AudioManager, streamType: Int, percent: Int) {
     val clampedPercent = percent.coerceIn(0, 100)
     val max = manager.getStreamMaxVolume(streamType).coerceAtLeast(1)
-    val targetIndex = ((clampedPercent / 100f) * max).roundToInt().coerceIn(0, max)
+    val currentIndex = manager.getStreamVolume(streamType).coerceIn(0, max)
+    val currentPercent = ((currentIndex.toFloat() / max.toFloat()) * 100f).roundToInt().coerceIn(0, 100)
+    var targetIndex = ((clampedPercent / 100f) * max).roundToInt().coerceIn(0, max)
+    if (clampedPercent > currentPercent && targetIndex <= currentIndex) {
+      targetIndex = (currentIndex + 1).coerceAtMost(max)
+    } else if (clampedPercent < currentPercent && targetIndex >= currentIndex) {
+      targetIndex = (currentIndex - 1).coerceAtLeast(0)
+    }
     manager.setStreamVolume(streamType, targetIndex, 0)
   }
 
@@ -249,7 +256,7 @@ class AndroidSoundSystemController(
 
   private companion object {
     const val TAG = "AndroidSoundController"
-    const val INTERNAL_CHANGE_WINDOW_MS = 1_500L
+    const val INTERNAL_CHANGE_WINDOW_MS = 400L
     const val VOLUME_CHANGED_ACTION = "android.media.VOLUME_CHANGED_ACTION"
   }
 }

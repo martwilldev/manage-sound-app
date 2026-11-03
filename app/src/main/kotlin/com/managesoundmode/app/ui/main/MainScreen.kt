@@ -653,11 +653,11 @@ private fun NowTabContent(
     item {
       UnifiedHeroAndModeCard(
         currentMode = state.currentMode,
+        mediaPercent = state.streams.mediaPercent,
         activeProfile = activeProfile,
         activeTimer = state.activeTimer,
         activeRuleTitle = state.activeRuleTitle,
         activeRuleSubtitle = state.activeRuleSubtitle,
-        muteMediaOnSilent = state.muteMediaOnSilent,
         onSelectMode = { mode ->
           haptics.performHapticFeedback(HapticFeedbackType.LongPress)
           onSelectMode(mode)
@@ -692,11 +692,11 @@ private fun NowTabContent(
 @Composable
 private fun UnifiedHeroAndModeCard(
   currentMode: SoundMode,
+  mediaPercent: Int,
   activeProfile: SoundProfile?,
   activeTimer: TimedModeSession?,
   activeRuleTitle: String?,
   activeRuleSubtitle: String?,
-  muteMediaOnSilent: Boolean,
   onSelectMode: (SoundMode) -> Unit,
   onOpenProfilesTab: () -> Unit,
   onStartTimer: (Int) -> Unit,
@@ -776,8 +776,8 @@ private fun UnifiedHeroAndModeCard(
               )
               val cleanSubtitle = when {
                 activeRuleTitle != null -> activeRuleTitle
-                currentMode != SoundMode.NORMAL && muteMediaOnSilent ->
-                  "${currentMode.subtitle} • Mídia 0%"
+                currentMode != SoundMode.NORMAL ->
+                  "${currentMode.subtitle} • Mídia ${mediaPercent}%"
                 else -> activeRuleSubtitle ?: currentMode.subtitle
               }
               Text(

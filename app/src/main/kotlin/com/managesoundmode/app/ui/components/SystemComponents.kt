@@ -53,7 +53,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -155,7 +157,15 @@ fun PillVolumeSliderRow(
   onValueChangeFinished: (Int) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  var sliderValue by remember(percent) { mutableStateOf(percent.toFloat()) }
+  var sliderValue by remember { mutableFloatStateOf(percent.toFloat()) }
+  var isDragging by remember { mutableStateOf(false) }
+
+  LaunchedEffect(percent) {
+    if (!isDragging) {
+      sliderValue = percent.toFloat()
+    }
+  }
+
   val currentPercent = sliderValue.roundToInt().coerceIn(0, 100)
 
   Column(
@@ -202,8 +212,14 @@ fun PillVolumeSliderRow(
 
     Slider(
       value = sliderValue,
-      onValueChange = { sliderValue = it },
-      onValueChangeFinished = { onValueChangeFinished(sliderValue.roundToInt()) },
+      onValueChange = {
+        isDragging = true
+        sliderValue = it
+      },
+      onValueChangeFinished = {
+        isDragging = false
+        onValueChangeFinished(sliderValue.roundToInt())
+      },
       valueRange = 0f..100f,
       modifier = Modifier
         .fillMaxWidth()

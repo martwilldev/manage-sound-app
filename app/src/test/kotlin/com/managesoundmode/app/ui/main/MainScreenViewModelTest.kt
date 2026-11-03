@@ -250,6 +250,51 @@ class MainScreenViewModelTest {
     assertEquals(SoundMode.NORMAL, afterRing.currentMode)
     assertEquals(70, afterRing.streams.ringPercent)
   }
+
+  @Test
+  fun handleExternalAudioChange_whenRaisingMediaVolumeWhileAlreadyInVibrate_neverRevertsToZero() = runTest {
+    fakePreferences.clearSchedules()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    // Enter VIBRATE -> media is auto-muted to 0%
+    viewModel.onSelectMode(SoundMode.VIBRATE)
+    assertEquals(0, (viewModel.uiState.value as MainScreenUiState.Ready).streams.mediaPercent)
+
+    // User presses physical Volume Up button while in VIBRATE to raise media to 40%
+    fakeSystemController.streams = fakeSystemController.streams.copy(mediaPercent = 40)
+    fakeSystemController.externalFlag = true
+    repository.handleExternalAudioChange()
+
+    // Volume MUST stay at 40% and never revert to 0%
+    val afterHardwareVolumeUp = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(SoundMode.VIBRATE, afterHardwareVolumeUp.currentMode)
+    assertEquals(40, afterHardwareVolumeUp.streams.mediaPercent)
+  }
+
+  @Test
+  fun onRefreshSystemState_afterIncreasingVolumeDuringActiveRule_neverRevertsToRuleVolume() = runTest {
+    fakePreferences.clearSchedules()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    val collegeRule = LocationRule.defaultLocations.first { it.id == "loc_college" }
+    viewModel.onToggleLocationRule(collegeRule, enabled = true)
+    viewModel.onToggleLocationPresence("loc_college", inside = true)
+    assertEquals(0, (viewModel.uiState.value as MainScreenUiState.Ready).streams.mediaPercent)
+
+    // User increases media volume to 65%
+    viewModel.onStreamVolumeChange(VolumeStreamType.MEDIA, 65)
+    assertEquals(65, (viewModel.uiState.value as MainScreenUiState.Ready).streams.mediaPercent)
+
+    // Simulate onResume calling onRefreshSystemState() -> evaluateAndApplyRules()
+    viewModel.onRefreshSystemState()
+
+    val afterResume = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(65, afterResume.streams.mediaPercent)
+  }
 }
 
 private class FakeSoundSystemController : SoundSystemController {
@@ -257,11 +302,15 @@ private class FakeSoundSystemController : SoundSystemController {
   var mode: SoundMode = SoundMode.NORMAL
   var streams: VolumeStreams = VolumeStreams()
   var dndGranted: Boolean = true
+  var externalFlag: Boolean = false
 
   override val systemChanges: Flow<Unit> = changes
-  override val lastBroadcastWasExternal: Boolean = false
+  override val lastBroadcastWasExternal: Boolean
+    get() = externalFlag
 
-  override fun clearExternalBroadcastFlag() {}
+  override fun clearExternalBroadcastFlag() {
+    externalFlag = false
+  }
 
   override fun readCurrentMode(): SoundMode = mode
 
