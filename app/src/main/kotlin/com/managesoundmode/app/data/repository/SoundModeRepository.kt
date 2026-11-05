@@ -17,6 +17,7 @@ import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.TransitionLogEntry
 import com.managesoundmode.app.domain.model.TransitionTriggerSource
 import com.managesoundmode.app.domain.model.VolumeStreamType
+import com.managesoundmode.app.system.LocationProximityHelper
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -60,6 +61,7 @@ interface SoundModeRepository {
   suspend fun upsertLocationRule(rule: LocationRule): Result<Unit>
   suspend fun deleteLocationRule(ruleId: String): Result<Unit>
   suspend fun toggleLocationPresence(ruleId: String, inside: Boolean): Result<Unit>
+  suspend fun syncLocationsWithDeviceCoordinates(latitude: Double, longitude: Double): Result<Int>
 
   suspend fun setRestorePolicy(policy: RestorePolicy): Result<Unit>
   suspend fun setDefaultDayProfileId(profileId: String): Result<Unit>
@@ -104,7 +106,7 @@ class DefaultSoundModeRepository(
 
   override val profilesStream: Flow<List<SoundProfile>> =
     preferencesDataSource.prefsFlow.combine(manualRefreshTrigger) { prefs, _ ->
-      mergeProfiles(prefs.customProfiles)
+      mergeProfiles(prefs.customProfiles, prefs.deletedProfileIds)
     }
 
   override val snapshotStream: Flow<DeviceSoundSnapshot> = combine(
@@ -117,7 +119,7 @@ class DefaultSoundModeRepository(
       Instant.ofEpochMilli(nowMillis),
       ZoneId.systemDefault(),
     )
-    val allProfiles = mergeProfiles(prefs.customProfiles)
+    val allProfiles = mergeProfiles(prefs.customProfiles, prefs.deletedProfileIds)
 
     val decision = RuleEvaluator.evaluate(
       nowDateTime = nowDateTime,
@@ -487,6 +489,47 @@ class DefaultSoundModeRepository(
     refreshSystemState()
   }
 
+  override suspend fun syncLocationsWithDeviceCoordinates(
+    latitude: Double,
+    longitude: Double,
+  ): Result<Int> = runCatching {
+    val prefs = preferencesDataSource.prefsFlow.first()
+    var matchedCount = 0
+    var stateChanged = false
+    var exitedRuleId: String? = null
+    for (rule in prefs.locationRules) {
+      val dist = LocationProximityHelper.distanceMeters(
+        lat1 = latitude,
+        lon1 = longitude,
+        lat2 = rule.latitude,
+        lon2 = rule.longitude,
+      )
+      val insideNow = dist <= rule.radiusMeters
+      if (insideNow && rule.enabled) {
+        matchedCount++
+      }
+      if (rule.isCurrentlyInside != insideNow) {
+        stateChanged = true
+        if (!insideNow) {
+          exitedRuleId = rule.id
+        }
+        preferencesDataSource.upsertLocationRule(rule.copy(isCurrentlyInside = insideNow))
+      }
+    }
+    if (stateChanged) {
+      preferencesDataSource.setOverriddenSessionKey(null)
+      if (matchedCount == 0 && exitedRuleId != null && prefs.lastAppliedRuleSessionKey?.contains(exitedRuleId) == true) {
+        preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_$exitedRuleId")
+      } else if (matchedCount > 0) {
+        preferencesDataSource.setLastAppliedRuleSessionKey(null)
+      }
+      evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
+      onRefreshExternalSurfaces()
+      refreshSystemState()
+    }
+    matchedCount
+  }
+
   override suspend fun setRestorePolicy(policy: RestorePolicy): Result<Unit> = runCatching {
     preferencesDataSource.setRestorePolicy(policy)
     onRefreshExternalSurfaces()
@@ -497,7 +540,7 @@ class DefaultSoundModeRepository(
     preferencesDataSource.setDefaultDayProfileId(profileId)
     val prefs = preferencesDataSource.prefsFlow.first()
     if (prefs.activeTimer == null && prefs.lastAppliedRuleSessionKey == null) {
-      val allProfiles = mergeProfiles(prefs.customProfiles)
+      val allProfiles = mergeProfiles(prefs.customProfiles, prefs.deletedProfileIds)
       val selectedDefault = allProfiles.firstOrNull { it.id == profileId }
       if (selectedDefault != null) {
         applyProfileToSystem(selectedDefault)
@@ -604,7 +647,7 @@ class DefaultSoundModeRepository(
     nowEpochMillis: Long,
   ): Result<RuleEvaluationDecision> = runCatching {
     val prefs = preferencesDataSource.prefsFlow.first()
-    val allProfiles = mergeProfiles(prefs.customProfiles)
+    val allProfiles = mergeProfiles(prefs.customProfiles, prefs.deletedProfileIds)
     val nowDateTime = LocalDateTime.ofInstant(
       Instant.ofEpochMilli(nowEpochMillis),
       ZoneId.systemDefault(),
@@ -831,7 +874,7 @@ class DefaultSoundModeRepository(
       Instant.ofEpochMilli(nowMillis),
       ZoneId.systemDefault(),
     )
-    val allProfiles = mergeProfiles(prefs.customProfiles)
+    val allProfiles = mergeProfiles(prefs.customProfiles, prefs.deletedProfileIds)
     val decision = RuleEvaluator.evaluate(
       nowDateTime = nowDateTime,
       nowEpochMillis = nowMillis,
@@ -874,14 +917,18 @@ class DefaultSoundModeRepository(
     )
   }
 
-  private fun mergeProfiles(savedProfiles: List<SoundProfile>): List<SoundProfile> {
+  private fun mergeProfiles(
+    savedProfiles: List<SoundProfile>,
+    deletedIds: Set<String> = emptySet(),
+  ): List<SoundProfile> {
     val savedById = savedProfiles.associateBy { it.id }
     val presetIds = SoundProfile.defaultPresets.map { it.id }.toSet()
     val resolvedPresets = SoundProfile.defaultPresets.map { preset ->
       savedById[preset.id]?.copy(isPreset = true) ?: preset
     }
     val extraCustom = savedProfiles.filterNot { it.id in presetIds }
-    return resolvedPresets + extraCustom
+    val merged = (resolvedPresets + extraCustom).filterNot { it.id in deletedIds }
+    return merged.ifEmpty { listOf(SoundProfile.defaultPresets.first()) }
   }
 
   private data class Quadruple<A, B, C, D>(

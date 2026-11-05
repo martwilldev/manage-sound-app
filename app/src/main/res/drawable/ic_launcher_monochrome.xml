@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Silhueta Monocromática Pura para Ícones Temáticos do Android 13–16 (Material You / Monet) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,47C34,45.343 35.343,44 37,44H42.6L52.2,35.9C53.8,34.55 56.25,35.69 56.25,37.78V68.22C56.25,70.31 53.8,71.45 52.2,70.1L42.6,62H37C35.343,62 34,60.657 34,59V47Z" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M62.5,44.5C65.8,47.0 67.8,50.3 67.8,53C67.8,55.7 65.8,59.0 62.5,61.5"
+        android:strokeWidth="4.4"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M68.2,38.5C73.6,42.5 76.8,47.5 76.8,53C76.8,58.5 73.6,63.5 68.2,67.5"
+        android:strokeWidth="4.2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M63.5,35.5m-3.2,0a3.2,3.2 0,1 1,6.4 0a3.2,3.2 0,1 1,-6.4 0" />
+</vector>

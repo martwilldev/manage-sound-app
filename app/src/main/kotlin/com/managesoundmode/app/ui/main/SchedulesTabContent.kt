@@ -1,7 +1,9 @@
 package com.managesoundmode.app.ui.main
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,27 +25,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,7 +68,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.managesoundmode.app.domain.model.ScheduleRule
 import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.domain.model.Weekday
@@ -77,6 +89,7 @@ internal fun SchedulesTabContent(
   canScheduleExactAlarms: Boolean,
   onToggleRule: (ScheduleRule, Boolean) -> Unit,
   onEditRule: (ScheduleRule) -> Unit,
+  onDeleteRule: (String) -> Unit = {},
   onRequestExactAlarmPermission: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -84,9 +97,20 @@ internal fun SchedulesTabContent(
     modifier = modifier
       .fillMaxSize()
       .testTag("schedules_tab_list"),
-    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp),
+    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
     verticalArrangement = Arrangement.spacedBy(3.dp),
   ) {
+    item {
+      Text(
+        text = "Toque para editar • Pressione e segure para opções ou excluir",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 4.dp, vertical = 6.dp),
+      )
+    }
+
     if (!canScheduleExactAlarms) {
       item {
         Card(
@@ -142,11 +166,13 @@ internal fun SchedulesTabContent(
         shape = groupedCardShape(index = index, totalCount = scheduleRules.size),
         onClick = { onEditRule(rule) },
         onToggleEnabled = { enabled -> onToggleRule(rule, enabled) },
+        onDelete = { onDeleteRule(rule.id) },
       )
     }
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun GoogleClockScheduleCard(
   rule: ScheduleRule,
@@ -154,7 +180,11 @@ private fun GoogleClockScheduleCard(
   shape: RoundedCornerShape,
   onClick: () -> Unit,
   onToggleEnabled: (Boolean) -> Unit,
+  onDelete: () -> Unit,
 ) {
+  val haptics = LocalHapticFeedback.current
+  var showContextMenu by remember { mutableStateOf(false) }
+
   val containerColor = if (rule.enabled) {
     MaterialTheme.colorScheme.surfaceContainerHigh
   } else {
@@ -165,7 +195,13 @@ private fun GoogleClockScheduleCard(
     modifier = Modifier
       .fillMaxWidth()
       .clip(shape)
-      .clickable(onClick = onClick)
+      .combinedClickable(
+        onClick = onClick,
+        onLongClick = {
+          haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+          showContextMenu = true
+        },
+      )
       .testTag("schedule_card_${rule.id}"),
     shape = shape,
     colors = CardDefaults.cardColors(containerColor = containerColor),
@@ -173,16 +209,17 @@ private fun GoogleClockScheduleCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 20.dp, vertical = 18.dp),
+        .padding(horizontal = 16.dp, vertical = 14.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-      // Linha 1: Nome da Rotina + Badge Tonal do Perfil
+      // Linha 1: Ícone + Nome da Rotina (largura flexível) + Menu (⋮)
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Row(
+          modifier = Modifier.weight(1f),
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -199,62 +236,85 @@ private fun GoogleClockScheduleCard(
           Text(
             text = rule.name,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             color = if (rule.enabled) {
               MaterialTheme.colorScheme.onSurface
             } else {
               MaterialTheme.colorScheme.onSurfaceVariant
             },
           )
-          if (rule.highPriority) {
-            Surface(
-              shape = RoundedCornerShape(50),
-              color = MaterialTheme.colorScheme.tertiaryContainer,
-            ) {
-              Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-              ) {
-                Icon(
-                  imageVector = Icons.Default.PriorityHigh,
-                  contentDescription = null,
-                  tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                  modifier = Modifier.size(12.dp),
-                )
-                Text(
-                  text = "Prioritário",
-                  style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-              }
-            }
-          }
         }
 
-        if (targetProfile != null) {
-          Surface(
-            shape = RoundedCornerShape(50),
-            color = if (rule.enabled) {
-              targetProfile.mode.tonalContainerColor()
-            } else {
-              MaterialTheme.colorScheme.surfaceContainerHighest
-            },
+        Box {
+          IconButton(
+            onClick = { showContextMenu = true },
+            modifier = Modifier.size(34.dp),
           ) {
-            Text(
-              text = "${targetProfile.name} • ${targetProfile.mode.title}",
-              style = MaterialTheme.typography.labelMedium,
-              color = if (rule.enabled) {
-                targetProfile.mode.onTonalContainerColor()
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+            Icon(
+              imageVector = Icons.Default.MoreVert,
+              contentDescription = "Opções do horário ${rule.name}",
+              tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.size(18.dp),
+            )
+          }
+
+          DropdownMenu(
+            expanded = showContextMenu,
+            onDismissRequest = { showContextMenu = false },
+          ) {
+            DropdownMenuItem(
+              text = { Text("Editar horário") },
+              leadingIcon = {
+                Icon(
+                  imageVector = Icons.Outlined.Edit,
+                  contentDescription = null,
+                )
               },
-              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+              onClick = {
+                showContextMenu = false
+                onClick()
+              },
+            )
+            DropdownMenuItem(
+              text = { Text(if (rule.enabled) "Desativar horário" else "Ativar horário") },
+              leadingIcon = {
+                Icon(
+                  imageVector = Icons.Default.Check,
+                  contentDescription = null,
+                )
+              },
+              onClick = {
+                showContextMenu = false
+                onToggleEnabled(!rule.enabled)
+              },
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+              text = {
+                Text(
+                  text = "Excluir horário",
+                  color = MaterialTheme.colorScheme.error,
+                )
+              },
+              leadingIcon = {
+                Icon(
+                  imageVector = Icons.Default.DeleteOutline,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.error,
+                )
+              },
+              onClick = {
+                showContextMenu = false
+                onDelete()
+              },
             )
           }
         }
       }
 
-      // Linha 2: Horário Grande Estilo Google Clock + Switch M3
+      // Linha 2: Horário Grande Estilo Google Clock + Switch M3 (adaptável a zoom aumentado)
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -262,8 +322,13 @@ private fun GoogleClockScheduleCard(
       ) {
         Text(
           text = rule.formattedWindow(),
-          style = MaterialTheme.typography.displaySmall,
+          style = MaterialTheme.typography.headlineMedium,
           fontWeight = if (rule.enabled) FontWeight.SemiBold else FontWeight.Light,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier
+            .weight(1f)
+            .padding(end = 8.dp),
           color = if (rule.enabled) {
             MaterialTheme.colorScheme.onSurface
           } else {
@@ -278,31 +343,78 @@ private fun GoogleClockScheduleCard(
         )
       }
 
-      // Linha 3: Resumo dos Dias da Semana + Resumo de Volume
-      Row(
+      // Linha 3: Badges e Dias da Semana em FlowRow (zero truncamento ou esmagamento vertical)
+      FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
       ) {
+        if (targetProfile != null) {
+          Surface(
+            shape = RoundedCornerShape(50),
+            color = if (rule.enabled) {
+              targetProfile.mode.tonalContainerColor()
+            } else {
+              MaterialTheme.colorScheme.surfaceContainerHighest
+            },
+          ) {
+            Text(
+              text = "${targetProfile.name} • ${targetProfile.mode.title}",
+              style = MaterialTheme.typography.labelMedium,
+              maxLines = 1,
+              softWrap = false,
+              color = if (rule.enabled) {
+                targetProfile.mode.onTonalContainerColor()
+              } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+              },
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+          }
+        }
+
+        if (rule.highPriority) {
+          Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Icon(
+                imageVector = Icons.Default.PriorityHigh,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(12.dp),
+              )
+              Text(
+                text = "Prioritário",
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                softWrap = false,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+              )
+            }
+          }
+        }
+
         Text(
           text = rule.formattedDaysSummary(),
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.align(Alignment.CenterVertically),
         )
-        if (targetProfile != null) {
-          Text(
-            text = targetProfile.summaryLabel(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
       }
     }
   }
 }
 
 /**
- * BottomSheet nativo para criar ou editar uma rotina de horário com `TimePicker` oficial do Material 3.
+ * Tela dedicada Full-Screen para criar ou editar uma rotina de horário com `TimePicker` oficial do Material 3.
+ * - Zero fechamento acidental.
+ * - Salva automaticamente ao editar (initialRule != null).
+ * - Apenas seleciona o perfil (não abre edição de perfil por dentro do horário).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -310,11 +422,11 @@ internal fun ScheduleEditorBottomSheet(
   initialRule: ScheduleRule?,
   profiles: List<SoundProfile>,
   onConfirm: (ScheduleRule) -> Unit,
+  onAutoSave: (ScheduleRule) -> Unit = {},
   onDelete: ((String) -> Unit)? = null,
-  onEditSelectedProfile: ((SoundProfile) -> Unit)? = null,
   onDismiss: () -> Unit,
 ) {
-  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  val isEditing = initialRule != null
   val haptics = LocalHapticFeedback.current
 
   var name by rememberSaveable { mutableStateOf(initialRule?.name ?: "") }
@@ -332,8 +444,29 @@ internal fun ScheduleEditorBottomSheet(
   }
   var highPriority by rememberSaveable { mutableStateOf(initialRule?.highPriority ?: false) }
 
-  // Estado para abrir o TimePicker nativo do Material 3 ("start" ou "end" ou null)
   var activeTimePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
+
+  fun buildRule(): ScheduleRule {
+    val resolvedName = name.trim().ifEmpty { initialRule?.name ?: "Rotina Agendada" }
+    return ScheduleRule(
+      id = initialRule?.id ?: "sched_${System.currentTimeMillis()}",
+      name = resolvedName,
+      startHour = startHour,
+      startMinute = startMinute,
+      endHour = endHour,
+      endMinute = endMinute,
+      daysOfWeek = selectedDays,
+      targetProfileId = selectedProfileId,
+      enabled = initialRule?.enabled ?: true,
+      highPriority = highPriority,
+    )
+  }
+
+  fun notifyAutoSaveIfEditing() {
+    if (isEditing) {
+      onAutoSave(buildRule())
+    }
+  }
 
   if (activeTimePickerTarget != null) {
     val isStart = activeTimePickerTarget == "start"
@@ -366,6 +499,7 @@ internal fun ScheduleEditorBottomSheet(
               endMinute = timePickerState.minute
             }
             activeTimePickerTarget = null
+            notifyAutoSaveIfEditing()
           },
         ) {
           Text("OK")
@@ -379,213 +513,245 @@ internal fun ScheduleEditorBottomSheet(
     )
   }
 
-  ModalBottomSheet(
-    onDismissRequest = onDismiss,
-    sheetState = sheetState,
-    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+  Dialog(
+    onDismissRequest = {
+      notifyAutoSaveIfEditing()
+      onDismiss()
+    },
+    properties = DialogProperties(
+      usePlatformDefaultWidth = false,
+      dismissOnClickOutside = false,
+      dismissOnBackPress = true,
+    ),
   ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .verticalScroll(rememberScrollState())
-        .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Text(
-          text = if (initialRule == null) "Novo Horário" else "Editar Horário",
-          style = MaterialTheme.typography.headlineSmall,
-          fontWeight = FontWeight.SemiBold,
+    Scaffold(
+      modifier = Modifier.fillMaxSize(),
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+      topBar = {
+        TopAppBar(
+          navigationIcon = {
+            IconButton(
+              onClick = {
+                notifyAutoSaveIfEditing()
+                onDismiss()
+              },
+            ) {
+              Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Voltar",
+              )
+            }
+          },
+          title = {
+            Column {
+              Text(
+                text = if (isEditing) "Editar Horário" else "Novo Horário",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+              if (isEditing) {
+                Text(
+                  text = "Salvo automaticamente",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.primary,
+                )
+              }
+            }
+          },
+          actions = {
+            if (isEditing && onDelete != null) {
+              IconButton(
+                onClick = { onDelete(initialRule.id) },
+                modifier = Modifier.testTag("delete_schedule_top_button"),
+              ) {
+                Icon(
+                  imageVector = Icons.Default.DeleteOutline,
+                  contentDescription = "Excluir horário",
+                  tint = MaterialTheme.colorScheme.error,
+                )
+              }
+            } else if (!isEditing) {
+              TextButton(
+                onClick = { onConfirm(buildRule()) },
+                modifier = Modifier.testTag("confirm_save_schedule_button"),
+              ) {
+                Text("Criar", fontWeight = FontWeight.Bold)
+              }
+            }
+          },
+          colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+          ),
         )
-        if (initialRule != null && onDelete != null) {
-          TextButton(onClick = { onDelete(initialRule.id) }) {
-            Icon(
-              imageVector = Icons.Default.DeleteOutline,
-              contentDescription = null,
-              modifier = Modifier.size(18.dp),
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Excluir")
-          }
-        }
-      }
-
-      // Cartões grandes de Início e Fim que abrem o TimePicker nativo do Android
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-      ) {
-        TimeBoxCard(
-          label = "INÍCIO",
-          timeText = String.format(Locale.ROOT, "%02d:%02d", startHour, startMinute),
-          onClick = { activeTimePickerTarget = "start" },
-          modifier = Modifier.weight(1f),
-        )
-        TimeBoxCard(
-          label = "FIM",
-          timeText = String.format(Locale.ROOT, "%02d:%02d", endHour, endMinute),
-          onClick = { activeTimePickerTarget = "end" },
-          modifier = Modifier.weight(1f),
-        )
-      }
-
-      OutlinedTextField(
-        value = name,
-        onValueChange = { name = it },
-        label = { Text("Nome da rotina (ex.: Dormir, Trabalho)") },
-        singleLine = true,
-        shape = RoundedCornerShape(16.dp),
+      },
+    ) { innerPadding ->
+      Column(
         modifier = Modifier
-          .fillMaxWidth()
-          .testTag("schedule_name_input"),
-      )
-
-      // Dias da semana (7 círculos estilo Google Clock)
-      Text(
-        text = "Repetir nos dias",
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+          .fillMaxSize()
+          .padding(innerPadding)
+          .verticalScroll(rememberScrollState())
+          .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
-        Weekday.entries.forEach { day ->
-          val selected = day in selectedDays
-          Box(
-            modifier = Modifier
-              .size(42.dp)
-              .clip(CircleShape)
-              .background(
-                if (selected) {
-                  MaterialTheme.colorScheme.primary
+        // Cartões grandes de Início e Fim que abrem o TimePicker nativo do Android
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          TimeBoxCard(
+            label = "INÍCIO",
+            timeText = String.format(Locale.ROOT, "%02d:%02d", startHour, startMinute),
+            onClick = { activeTimePickerTarget = "start" },
+            modifier = Modifier.weight(1f),
+          )
+          TimeBoxCard(
+            label = "FIM",
+            timeText = String.format(Locale.ROOT, "%02d:%02d", endHour, endMinute),
+            onClick = { activeTimePickerTarget = "end" },
+            modifier = Modifier.weight(1f),
+          )
+        }
+
+        OutlinedTextField(
+          value = name,
+          onValueChange = {
+            name = it
+            notifyAutoSaveIfEditing()
+          },
+          label = { Text("Nome da rotina (ex.: Dormir, Trabalho)") },
+          singleLine = true,
+          shape = RoundedCornerShape(16.dp),
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("schedule_name_input"),
+        )
+
+        // Dias da semana (7 círculos responsivos estilo Google Clock)
+        Text(
+          text = "Repetir nos dias",
+          style = MaterialTheme.typography.titleSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          Weekday.entries.forEach { day ->
+            val selected = day in selectedDays
+            Box(
+              modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(
+                  if (selected) {
+                    MaterialTheme.colorScheme.primary
+                  } else {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                  },
+                )
+                .clickable {
+                  haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                  selectedDays = if (selected && selectedDays.size > 1) {
+                    selectedDays - day
+                  } else {
+                    selectedDays + day
+                  }
+                  notifyAutoSaveIfEditing()
+                },
+              contentAlignment = Alignment.Center,
+            ) {
+              Text(
+                text = day.shortLabel,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false,
+                color = if (selected) {
+                  MaterialTheme.colorScheme.onPrimary
                 } else {
-                  MaterialTheme.colorScheme.surfaceContainerHighest
+                  MaterialTheme.colorScheme.onSurfaceVariant
                 },
               )
-              .clickable {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                selectedDays = if (selected && selectedDays.size > 1) {
-                  selectedDays - day
-                } else {
-                  selectedDays + day
-                }
-              },
-            contentAlignment = Alignment.Center,
-          ) {
-            Text(
-              text = day.shortLabel,
-              style = MaterialTheme.typography.labelLarge,
-              fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-              color = if (selected) {
-                MaterialTheme.colorScheme.onPrimary
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-              },
-            )
+            }
           }
         }
-      }
 
-      // Perfil vinculado + botão de editar volumes do perfil selecionado
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
+        // Seleção exclusiva de Perfil (sem edição de perfil embutida)
         Text(
           text = "Perfil de som aplicado",
           style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        val currentSelectedProfile = profiles.firstOrNull { it.id == selectedProfileId }
-        if (currentSelectedProfile != null && onEditSelectedProfile != null) {
-          TextButton(onClick = { onEditSelectedProfile(currentSelectedProfile) }) {
-            Icon(
-              imageVector = Icons.Default.Edit,
-              contentDescription = null,
-              modifier = Modifier.size(16.dp),
+
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          profiles.forEach { profile ->
+            val selected = selectedProfileId == profile.id
+            FilterChip(
+              selected = selected,
+              onClick = {
+                selectedProfileId = profile.id
+                notifyAutoSaveIfEditing()
+              },
+              leadingIcon = {
+                Icon(
+                  imageVector = profileIconForKey(profile.iconKey),
+                  contentDescription = null,
+                  modifier = Modifier.size(16.dp),
+                )
+              },
+              label = { Text(profile.name) },
             )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Ajustar volumes de '${currentSelectedProfile.name}'")
           }
         }
-      }
 
-      FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        profiles.forEach { profile ->
-          val selected = selectedProfileId == profile.id
-          FilterChip(
-            selected = selected,
-            onClick = { selectedProfileId = profile.id },
-            leadingIcon = {
-              Icon(
-                imageVector = profileIconForKey(profile.iconKey),
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-              )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Column(
+            modifier = Modifier
+              .weight(1f)
+              .padding(end = 12.dp),
+          ) {
+            Text(
+              text = "Alta Prioridade (Sobrepor outros)",
+              style = MaterialTheme.typography.bodyMedium,
+              fontWeight = FontWeight.Medium,
+            )
+            Text(
+              text = "Vence conflitos mesmo quando configurado para Som Alto",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          M3CheckSwitch(
+            checked = highPriority,
+            onCheckedChange = {
+              highPriority = it
+              notifyAutoSaveIfEditing()
             },
-            label = { Text(profile.name) },
           )
         }
-      }
 
-      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Column(modifier = Modifier.weight(1f)) {
-          Text(
-            text = "Alta Prioridade (Sobrepor outros)",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-          )
-          Text(
-            text = "Vence conflitos mesmo quando configurado para Som Alto",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
+        if (!isEditing) {
+          Button(
+            onClick = { onConfirm(buildRule()) },
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(52.dp),
+          ) {
+            Text("Criar Horário")
+          }
         }
-        M3CheckSwitch(
-          checked = highPriority,
-          onCheckedChange = { highPriority = it },
-        )
-      }
-
-      Button(
-        onClick = {
-          val resolvedName = name.trim().ifEmpty { "Rotina Agendada" }
-          onConfirm(
-            ScheduleRule(
-              id = initialRule?.id ?: "sched_${System.currentTimeMillis()}",
-              name = resolvedName,
-              startHour = startHour,
-              startMinute = startMinute,
-              endHour = endHour,
-              endMinute = endMinute,
-              daysOfWeek = selectedDays,
-              targetProfileId = selectedProfileId,
-              enabled = initialRule?.enabled ?: true,
-              highPriority = highPriority,
-            ),
-          )
-        },
-        modifier = Modifier
-          .fillMaxWidth()
-          .height(52.dp)
-          .testTag("confirm_save_schedule_button"),
-      ) {
-        Text("Salvar Horário")
       }
     }
   }
@@ -608,19 +774,23 @@ private fun TimeBoxCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(vertical = 14.dp, horizontal = 16.dp),
+        .padding(vertical = 14.dp, horizontal = 12.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
       Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
+        maxLines = 1,
+        softWrap = false,
         color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
       )
       Text(
         text = timeText,
-        style = MaterialTheme.typography.headlineMedium,
+        style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false,
         color = MaterialTheme.colorScheme.onSecondaryContainer,
       )
     }

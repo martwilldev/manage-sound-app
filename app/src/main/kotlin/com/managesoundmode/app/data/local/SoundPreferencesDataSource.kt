@@ -33,6 +33,7 @@ data class PersistedSoundPrefs(
   val activeProfileId: String? = null,
   val activeTimer: TimedModeSession? = null,
   val customProfiles: List<SoundProfile> = emptyList(),
+  val deletedProfileIds: Set<String> = emptySet(),
   val scheduleRules: List<ScheduleRule> = ScheduleRule.defaultSchedules,
   val locationRules: List<LocationRule> = LocationRule.defaultLocations,
   val restorePolicy: RestorePolicy = RestorePolicy.DEFAULT_PROFILE,
@@ -110,6 +111,11 @@ class DataStoreSoundPreferencesDataSource(
             .getOrDefault(emptyList())
         } ?: emptyList()
 
+        val deletedProfileIds = prefs[KEY_DELETED_PROFILE_IDS_JSON]?.let { raw ->
+          runCatching { json.decodeFromString<Set<String>>(raw) }
+            .getOrDefault(emptySet())
+        } ?: emptySet()
+
         val scheduleRules = prefs[KEY_SCHEDULE_RULES_JSON]?.let { raw ->
           runCatching { json.decodeFromString<List<ScheduleRule>>(raw) }
             .onFailure { Log.w(TAG, "Falha ao desserializar regras de horário", it) }
@@ -146,6 +152,7 @@ class DataStoreSoundPreferencesDataSource(
           activeProfileId = activeProfileId,
           activeTimer = activeTimer,
           customProfiles = customProfiles,
+          deletedProfileIds = deletedProfileIds,
           scheduleRules = scheduleRules,
           locationRules = locationRules,
           restorePolicy = restorePolicy,
@@ -194,6 +201,13 @@ class DataStoreSoundPreferencesDataSource(
       } ?: emptyList()
       val updated = currentList.filterNot { it.id == profile.id } + profile
       prefs[KEY_CUSTOM_PROFILES_JSON] = json.encodeToString(updated)
+
+      val deletedIds = prefs[KEY_DELETED_PROFILE_IDS_JSON]?.let { raw ->
+        runCatching { json.decodeFromString<Set<String>>(raw) }.getOrDefault(emptySet())
+      } ?: emptySet()
+      if (profile.id in deletedIds) {
+        prefs[KEY_DELETED_PROFILE_IDS_JSON] = json.encodeToString(deletedIds - profile.id)
+      }
     }
   }
 
@@ -204,6 +218,11 @@ class DataStoreSoundPreferencesDataSource(
       } ?: emptyList()
       val updated = currentList.filterNot { it.id == profileId }
       prefs[KEY_CUSTOM_PROFILES_JSON] = json.encodeToString(updated)
+
+      val deletedIds = prefs[KEY_DELETED_PROFILE_IDS_JSON]?.let { raw ->
+        runCatching { json.decodeFromString<Set<String>>(raw) }.getOrDefault(emptySet())
+      } ?: emptySet()
+      prefs[KEY_DELETED_PROFILE_IDS_JSON] = json.encodeToString(deletedIds + profileId)
     }
   }
 
@@ -389,6 +408,7 @@ class DataStoreSoundPreferencesDataSource(
     val KEY_ACTIVE_PROFILE_ID = stringPreferencesKey("active_profile_id")
     val KEY_ACTIVE_TIMER_JSON = stringPreferencesKey("active_timer_json")
     val KEY_CUSTOM_PROFILES_JSON = stringPreferencesKey("custom_profiles_json")
+    val KEY_DELETED_PROFILE_IDS_JSON = stringPreferencesKey("deleted_profile_ids_json")
     val KEY_SCHEDULE_RULES_JSON = stringPreferencesKey("schedule_rules_json")
     val KEY_LOCATION_RULES_JSON = stringPreferencesKey("location_rules_json")
     val KEY_RESTORE_POLICY = stringPreferencesKey("restore_policy")

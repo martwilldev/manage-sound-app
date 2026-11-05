@@ -57,3 +57,9 @@
 -keep class com.managesoundmode.app.widget.** { *; }
 -keep class com.managesoundmode.app.tile.** { *; }
 -keep class com.managesoundmode.app.receiver.** { *; }
+
+# Preserva métodos @JavascriptInterface usados pela ponte do mapa OpenStreetMap (Leaflet WebView)
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class com.managesoundmode.app.ui.components.OsmWebMapBridge { *; }

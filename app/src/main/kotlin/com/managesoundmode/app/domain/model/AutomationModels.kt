@@ -116,6 +116,9 @@ data class LocationRule(
     require(radiusMeters in 100..2000) { "Raio deve estar entre 100m e 2000m" }
   }
 
+  fun formattedCoordinates(): String =
+    String.format(Locale.ROOT, "%.4f, %.4f", latitude, longitude)
+
   companion object {
     val defaultLocations: List<LocationRule> = listOf(
       LocationRule(

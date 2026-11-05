@@ -19,6 +19,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -122,7 +124,7 @@ enum class MainAppTab(
 ) {
   NOW(
     label = "Agora",
-    topBarTitle = "Som e Modos",
+    topBarTitle = "Modos de Som",
     icon = Icons.AutoMirrored.Filled.VolumeUp,
     tag = "tab_now",
   ),
@@ -210,7 +212,12 @@ fun MainScreen(
           onExtendTimer = viewModel::onExtendTimer,
           onCancelTimer = viewModel::onCancelTimer,
           onSaveProfile = viewModel::onSaveCurrentAsProfile,
-          onUpsertProfile = viewModel::onUpsertProfile,
+          onUpsertProfile = { profile, applyNow ->
+            viewModel.onUpsertProfile(profile, applyNow, showFeedback = true)
+          },
+          onAutoSaveProfile = { profile ->
+            viewModel.onUpsertProfile(profile, applyImmediately = false, showFeedback = false)
+          },
           onDismissMessage = viewModel::onDismissMessage,
           onRequestDndPermission = {
             val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
@@ -238,13 +245,25 @@ fun MainScreen(
             }
           },
           onReapplyActiveRule = viewModel::onReapplyActiveRule,
-          onUpsertScheduleRule = viewModel::onUpsertScheduleRule,
+          onUpsertScheduleRule = { rule ->
+            viewModel.onUpsertScheduleRule(rule, showFeedback = true)
+          },
+          onAutoSaveScheduleRule = { rule ->
+            viewModel.onUpsertScheduleRule(rule, showFeedback = false)
+          },
           onToggleScheduleRule = viewModel::onToggleScheduleRule,
           onDeleteScheduleRule = viewModel::onDeleteScheduleRule,
-          onUpsertLocationRule = viewModel::onUpsertLocationRule,
+          onUpsertLocationRule = { rule ->
+            viewModel.onUpsertLocationRule(rule, showFeedback = true)
+          },
+          onAutoSaveLocationRule = { rule ->
+            viewModel.onUpsertLocationRule(rule, showFeedback = false)
+          },
           onToggleLocationRule = viewModel::onToggleLocationRule,
           onToggleLocationPresence = viewModel::onToggleLocationPresence,
           onDeleteLocationRule = viewModel::onDeleteLocationRule,
+          onSyncLocationsWithGps = viewModel::onSyncLocationsWithGps,
+          onShowStatusMessage = viewModel::onShowStatusMessage,
           onAcceptLocationDisclosure = viewModel::onAcceptLocationDisclosure,
           onDeleteCustomProfile = viewModel::onDeleteCustomProfile,
           onSetRestorePolicy = viewModel::onSetRestorePolicy,
@@ -316,16 +335,27 @@ internal fun MainDashboardContent(
   onUpsertProfile: (SoundProfile, Boolean) -> Unit = { profile, _ ->
     onSaveProfile(profile.name, profile.description)
   },
+  onAutoSaveProfile: (SoundProfile) -> Unit = { profile ->
+    onUpsertProfile(profile, false)
+  },
   onRequestExactAlarmPermission: () -> Unit = {},
   onRequestNotificationPermission: () -> Unit = {},
   onReapplyActiveRule: () -> Unit = {},
   onUpsertScheduleRule: (ScheduleRule) -> Unit = {},
+  onAutoSaveScheduleRule: (ScheduleRule) -> Unit = { rule ->
+    onUpsertScheduleRule(rule)
+  },
   onToggleScheduleRule: (ScheduleRule, Boolean) -> Unit = { _, _ -> },
   onDeleteScheduleRule: (String) -> Unit = {},
   onUpsertLocationRule: (LocationRule) -> Unit = {},
+  onAutoSaveLocationRule: (LocationRule) -> Unit = { rule ->
+    onUpsertLocationRule(rule)
+  },
   onToggleLocationRule: (LocationRule, Boolean) -> Unit = { _, _ -> },
   onToggleLocationPresence: (String, Boolean) -> Unit = { _, _ -> },
   onDeleteLocationRule: (String) -> Unit = {},
+  onSyncLocationsWithGps: (Double, Double) -> Unit = { _, _ -> },
+  onShowStatusMessage: (String) -> Unit = {},
   onAcceptLocationDisclosure: () -> Unit = {},
   onDeleteCustomProfile: (String) -> Unit = {},
   onSetRestorePolicy: (RestorePolicy) -> Unit = {},
@@ -346,15 +376,15 @@ internal fun MainDashboardContent(
   val snackbarHostState = remember { SnackbarHostState() }
   var selectedTab by rememberSaveable { mutableStateOf(MainAppTab.NOW) }
 
-  // Estado unificado para o BottomSheet Editor de Perfil
+  // Estado unificado para o Editor Full-Screen de Perfil
   var editingProfile by remember { mutableStateOf<SoundProfile?>(null) }
   var showProfileBottomSheet by rememberSaveable { mutableStateOf(false) }
 
-  // Estado para o BottomSheet Editor de Horário
+  // Estado para o Editor Full-Screen de Horário
   var editingScheduleRule by remember { mutableStateOf<ScheduleRule?>(null) }
   var showScheduleBottomSheet by rememberSaveable { mutableStateOf(false) }
 
-  // Estado para o BottomSheet Editor de Local
+  // Estado para o Editor Full-Screen de Local
   var editingLocationRule by remember { mutableStateOf<LocationRule?>(null) }
   var showLocationDisclosureDialog by rememberSaveable { mutableStateOf(false) }
   var showLocationBottomSheet by rememberSaveable { mutableStateOf(false) }
@@ -378,10 +408,15 @@ internal fun MainDashboardContent(
           selectedTab = MainAppTab.NOW
         }
       },
-      onDeleteProfile = { profileId ->
-        showProfileBottomSheet = false
-        editingProfile = null
-        onDeleteCustomProfile(profileId)
+      onAutoSaveProfile = onAutoSaveProfile,
+      onDeleteProfile = if (state.profiles.size > 1) {
+        { profileId ->
+          showProfileBottomSheet = false
+          editingProfile = null
+          onDeleteCustomProfile(profileId)
+        }
+      } else {
+        null
       },
       onDismiss = {
         showProfileBottomSheet = false
@@ -399,14 +434,11 @@ internal fun MainDashboardContent(
         editingScheduleRule = null
         onUpsertScheduleRule(rule)
       },
+      onAutoSave = onAutoSaveScheduleRule,
       onDelete = { ruleId ->
         showScheduleBottomSheet = false
         editingScheduleRule = null
         onDeleteScheduleRule(ruleId)
-      },
-      onEditSelectedProfile = { profileToEdit ->
-        editingProfile = profileToEdit
-        showProfileBottomSheet = true
       },
       onDismiss = {
         showScheduleBottomSheet = false
@@ -436,6 +468,7 @@ internal fun MainDashboardContent(
         editingLocationRule = null
         onUpsertLocationRule(rule)
       },
+      onAutoSave = onAutoSaveLocationRule,
       onTogglePresence = onToggleLocationPresence,
       onDelete = { ruleId ->
         showLocationBottomSheet = false
@@ -580,6 +613,7 @@ internal fun MainDashboardContent(
             editingProfile = profile
             showProfileBottomSheet = true
           },
+          onDeleteProfile = onDeleteCustomProfile,
           onSetDefaultDayProfileId = onSetDefaultDayProfileId,
           modifier = Modifier.padding(innerPadding),
         )
@@ -595,6 +629,7 @@ internal fun MainDashboardContent(
             editingScheduleRule = rule
             showScheduleBottomSheet = true
           },
+          onDeleteRule = onDeleteScheduleRule,
           onRequestExactAlarmPermission = onRequestExactAlarmPermission,
           modifier = Modifier.padding(innerPadding),
         )
@@ -605,10 +640,14 @@ internal fun MainDashboardContent(
           locationRules = state.locationRules,
           profiles = state.profiles,
           onToggleRule = onToggleLocationRule,
+          onTogglePresence = onToggleLocationPresence,
           onEditRule = { rule ->
             editingLocationRule = rule
             showLocationBottomSheet = true
           },
+          onDeleteRule = onDeleteLocationRule,
+          onSyncGpsCoordinates = onSyncLocationsWithGps,
+          onShowStatusMessage = onShowStatusMessage,
           modifier = Modifier.padding(innerPadding),
         )
       }
@@ -713,6 +752,7 @@ private fun NowTabContent(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UnifiedHeroAndModeCard(
   currentMode: SoundMode,
@@ -842,6 +882,8 @@ private fun UnifiedHeroAndModeCard(
                 fontWeight = FontWeight.SemiBold,
                 color = animatedOnContainer,
                 maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
               )
               Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -894,7 +936,7 @@ private fun UnifiedHeroAndModeCard(
             Row(
               modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 11.dp),
+                .padding(horizontal = 6.dp, vertical = 11.dp),
               horizontalArrangement = Arrangement.Center,
               verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -904,7 +946,7 @@ private fun UnifiedHeroAndModeCard(
                 tint = chipContent,
                 modifier = Modifier.size(18.dp),
               )
-              Spacer(modifier = Modifier.width(6.dp))
+              Spacer(modifier = Modifier.width(5.dp))
               Text(
                 text = when (mode) {
                   SoundMode.NORMAL -> "Som"
@@ -915,6 +957,8 @@ private fun UnifiedHeroAndModeCard(
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = chipContent,
                 maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
               )
             }
           }
@@ -931,12 +975,13 @@ private fun UnifiedHeroAndModeCard(
           HorizontalDivider(
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
           )
-          Row(
+          FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
           ) {
             Row(
+              modifier = Modifier.padding(top = 4.dp),
               verticalAlignment = Alignment.CenterVertically,
               horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -955,6 +1000,8 @@ private fun UnifiedHeroAndModeCard(
                 },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false,
               )
             }
 
@@ -975,6 +1022,8 @@ private fun UnifiedHeroAndModeCard(
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                   )
                 }
@@ -983,7 +1032,12 @@ private fun UnifiedHeroAndModeCard(
                   contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                   modifier = Modifier.testTag("cancel_timer_button"),
                 ) {
-                  Text("Restaurar", style = MaterialTheme.typography.labelMedium)
+                  Text(
+                    text = "Restaurar",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    softWrap = false,
+                  )
                 }
               }
             } else {
@@ -1002,6 +1056,8 @@ private fun UnifiedHeroAndModeCard(
                       style = MaterialTheme.typography.labelMedium,
                       fontWeight = FontWeight.Medium,
                       color = MaterialTheme.colorScheme.onSurface,
+                      maxLines = 1,
+                      softWrap = false,
                       modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                     )
                   }

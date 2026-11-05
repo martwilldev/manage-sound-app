@@ -348,6 +348,55 @@ class MainScreenViewModelTest {
     assertEquals(64, restoredPercent)
     assertEquals(64, (viewModel.uiState.value as MainScreenUiState.Ready).streams.mediaPercent)
   }
+
+  @Test
+  fun onDeleteCustomProfile_canDeletePresetProfile_andAutoSaveUpdatesWithoutStatusMessage() = runTest {
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    val initialProfiles = (viewModel.uiState.value as MainScreenUiState.Ready).profiles
+    assertTrue(initialProfiles.any { it.id == "preset_meeting" })
+
+    viewModel.onDeleteCustomProfile("preset_meeting")
+    val afterDelete = viewModel.uiState.value as MainScreenUiState.Ready
+    assertTrue(afterDelete.profiles.none { it.id == "preset_meeting" })
+    assertEquals("Perfil removido", afterDelete.statusMessage)
+    viewModel.onDismissMessage()
+
+    val sleepProfile = afterDelete.profiles.first { it.id == "preset_sleep" }
+    viewModel.onUpsertProfile(
+      sleepProfile.copy(name = "Dormir Profundo"),
+      applyImmediately = false,
+      showFeedback = false,
+    )
+    val afterAutoSave = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals("Dormir Profundo", afterAutoSave.profiles.first { it.id == "preset_sleep" }.name)
+    assertNull(afterAutoSave.statusMessage)
+  }
+
+  @Test
+  fun onSyncLocationsWithGps_activatesGeofenceWhenInsideRadius_andDeactivatesWhenOutside() = runTest {
+    fakePreferences.clearSchedules()
+    backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+      viewModel.uiState.collect()
+    }
+
+    val collegeRule = LocationRule.defaultLocations.first { it.id == "loc_college" }
+    viewModel.onToggleLocationRule(collegeRule, enabled = true)
+
+    // Coordinates ~30m away from loc_college (-23.5505, -46.6333, radius 200m)
+    viewModel.onSyncLocationsWithGps(latitude = -23.5506, longitude = -46.6334)
+    val insideState = viewModel.uiState.value as MainScreenUiState.Ready
+    assertTrue(insideState.locationRules.first { it.id == "loc_college" }.isCurrentlyInside)
+    assertEquals(SoundMode.VIBRATE, insideState.currentMode)
+
+    // Coordinates ~5km away -> outside all geofences
+    viewModel.onSyncLocationsWithGps(latitude = -23.6000, longitude = -46.7000)
+    val outsideState = viewModel.uiState.value as MainScreenUiState.Ready
+    assertEquals(false, outsideState.locationRules.first { it.id == "loc_college" }.isCurrentlyInside)
+    assertEquals(SoundMode.NORMAL, outsideState.currentMode)
+  }
 }
 
 private class FakeSoundSystemController : SoundSystemController {
@@ -408,12 +457,18 @@ private class FakeSoundPreferencesDataSource : SoundPreferencesDataSource {
 
   override suspend fun upsertCustomProfile(profile: SoundProfile) {
     val updated = state.value.customProfiles.filterNot { it.id == profile.id } + profile
-    state.value = state.value.copy(customProfiles = updated)
+    state.value = state.value.copy(
+      customProfiles = updated,
+      deletedProfileIds = state.value.deletedProfileIds - profile.id,
+    )
   }
 
   override suspend fun deleteCustomProfile(profileId: String) {
     val updated = state.value.customProfiles.filterNot { it.id == profileId }
-    state.value = state.value.copy(customProfiles = updated)
+    state.value = state.value.copy(
+      customProfiles = updated,
+      deletedProfileIds = state.value.deletedProfileIds + profileId,
+    )
   }
 
   override suspend fun upsertScheduleRule(rule: ScheduleRule) {

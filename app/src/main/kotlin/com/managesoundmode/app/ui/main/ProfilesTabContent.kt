@@ -1,7 +1,8 @@
 package com.managesoundmode.app.ui.main
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,19 +22,30 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,15 +63,29 @@ fun ProfilesTabContent(
   onActivateProfile: (SoundProfile) -> Unit,
   onEditProfile: (SoundProfile) -> Unit,
   onSetDefaultDayProfileId: (String) -> Unit,
+  onDeleteProfile: (String) -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
+  val canDeleteProfiles = state.profiles.size > 1
+
   LazyColumn(
     modifier = modifier
       .fillMaxSize()
       .testTag("profiles_tab_list"),
-    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp),
+    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
     verticalArrangement = Arrangement.spacedBy(3.dp),
   ) {
+    item {
+      Text(
+        text = "Toque para ativar • Pressione e segure para editar ou excluir",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 4.dp, vertical = 6.dp),
+      )
+    }
+
     itemsIndexed(
       items = state.profiles,
       key = { _, profile -> profile.id },
@@ -70,9 +96,12 @@ fun ProfilesTabContent(
         profile = profile,
         isActive = isActive,
         isDefaultRestore = isDefaultRestore,
+        canDelete = canDeleteProfiles,
         shape = groupedCardShape(index = index, totalCount = state.profiles.size),
         onActivate = { onActivateProfile(profile) },
         onEdit = { onEditProfile(profile) },
+        onSetDefault = { onSetDefaultDayProfileId(profile.id) },
+        onDelete = { onDeleteProfile(profile.id) },
       )
     }
 
@@ -136,49 +165,59 @@ fun ProfilesTabContent(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ProfileGroupedCard(
   profile: SoundProfile,
   isActive: Boolean,
   isDefaultRestore: Boolean,
+  canDelete: Boolean,
   shape: RoundedCornerShape,
   onActivate: () -> Unit,
   onEdit: () -> Unit,
+  onSetDefault: () -> Unit,
+  onDelete: () -> Unit,
 ) {
+  val haptics = LocalHapticFeedback.current
+  var showContextMenu by remember { mutableStateOf(false) }
+
   val containerColor = if (isActive) {
     MaterialTheme.colorScheme.secondaryContainer
   } else {
     MaterialTheme.colorScheme.surfaceContainerLow
   }
 
-  Card(
-    modifier = Modifier
-      .fillMaxWidth()
-      .clip(shape)
-      .clickable(onClick = onActivate)
-      .testTag("profile_card_${profile.id}"),
-    shape = shape,
-    colors = CardDefaults.cardColors(containerColor = containerColor),
-  ) {
-    Column(
+  Box(modifier = Modifier.fillMaxWidth()) {
+    Card(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 20.dp, vertical = 18.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp),
+        .clip(shape)
+        .combinedClickable(
+          onClick = onActivate,
+          onLongClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            showContextMenu = true
+          },
+        )
+        .testTag("profile_card_${profile.id}"),
+      shape = shape,
+      colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
       ) {
+        // Linha 1: Ícone + Nome e Descrição com largura livre + Menu (⋮)
         Row(
-          modifier = Modifier.weight(1f),
+          modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(14.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
           Box(
             modifier = Modifier
-              .size(44.dp)
+              .size(42.dp)
               .clip(CircleShape)
               .background(
                 if (isActive) {
@@ -205,46 +244,103 @@ private fun ProfileGroupedCard(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
           ) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-              Text(
-                text = profile.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-              if (isActive) {
-                Surface(
-                  shape = RoundedCornerShape(50),
-                  color = MaterialTheme.colorScheme.primary,
-                ) {
-                  Text(
-                    text = "Ativo",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                  )
-                }
-              }
-            }
             Text(
-              text = profile.description,
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              text = profile.name,
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.SemiBold,
+              color = MaterialTheme.colorScheme.onSurface,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
             )
+            if (profile.description.isNotBlank()) {
+              Text(
+                text = profile.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
+          }
+
+          Box {
+            IconButton(
+              onClick = { showContextMenu = true },
+              modifier = Modifier
+                .size(36.dp)
+                .testTag("edit_profile_${profile.id}"),
+            ) {
+              Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "Opções do perfil ${profile.name}",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+              )
+            }
+
+            DropdownMenu(
+              expanded = showContextMenu,
+              onDismissRequest = { showContextMenu = false },
+            ) {
+              DropdownMenuItem(
+                text = { Text("Editar perfil") },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = null,
+                  )
+                },
+                onClick = {
+                  showContextMenu = false
+                  onEdit()
+                },
+              )
+              if (!isDefaultRestore) {
+                DropdownMenuItem(
+                  text = { Text("Definir como padrão de retorno") },
+                  leadingIcon = {
+                    Icon(
+                      imageVector = Icons.Filled.Check,
+                      contentDescription = null,
+                    )
+                  },
+                  onClick = {
+                    showContextMenu = false
+                    onSetDefault()
+                  },
+                )
+              }
+              if (canDelete) {
+                HorizontalDivider()
+                DropdownMenuItem(
+                  text = {
+                    Text(
+                      text = "Excluir perfil",
+                      color = MaterialTheme.colorScheme.error,
+                    )
+                  },
+                  leadingIcon = {
+                    Icon(
+                      imageVector = Icons.Default.DeleteOutline,
+                      contentDescription = null,
+                      tint = MaterialTheme.colorScheme.error,
+                    )
+                  },
+                  onClick = {
+                    showContextMenu = false
+                    onDelete()
+                  },
+                )
+              }
+            }
           }
         }
 
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(4.dp),
+        // Linha 2: Badges responsivos em FlowRow (nunca esmagam nem quebram verticalmente em zoom aumentado)
+        FlowRow(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
           Surface(
             shape = RoundedCornerShape(50),
@@ -253,40 +349,57 @@ private fun ProfileGroupedCard(
             Text(
               text = profile.mode.title,
               style = MaterialTheme.typography.labelMedium,
+              fontWeight = FontWeight.Medium,
               color = profile.mode.onTonalContainerColor(),
+              maxLines = 1,
+              softWrap = false,
               modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             )
           }
 
-          IconButton(
-            onClick = onEdit,
-            modifier = Modifier
-              .size(36.dp)
-              .testTag("edit_profile_${profile.id}"),
-          ) {
-            Icon(
-              imageVector = Icons.Outlined.Edit,
-              contentDescription = "Editar perfil ${profile.name}",
-              tint = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.size(18.dp),
-            )
+          if (isActive) {
+            Surface(
+              shape = RoundedCornerShape(50),
+              color = MaterialTheme.colorScheme.primary,
+            ) {
+              Text(
+                text = "Ativo agora",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+              )
+            }
+          }
+
+          if (isDefaultRestore) {
+            Surface(
+              shape = RoundedCornerShape(50),
+              color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+              Text(
+                text = "Padrão de retorno",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+              )
+            }
           }
         }
-      }
 
-      // Linha inferior de resumo (idêntica a Horários e Locais)
-      Text(
-        text = buildString {
-          append("Toque ${profile.streams.ringPercent}% • Notif ${profile.streams.notificationPercent}% • Mídia ${profile.streams.mediaPercent}% • Alarme ${profile.streams.alarmPercent}%")
-          if (isDefaultRestore) {
-            append(" • Retorno")
-          }
-        },
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
+        // Linha 3: Resumo completo dos 4 canais de volume (até 2 linhas em proporção aumentada)
+        Text(
+          text = "Toque ${profile.streams.ringPercent}% • Notif ${profile.streams.notificationPercent}% • Mídia ${profile.streams.mediaPercent}% • Alarme ${profile.streams.alarmPercent}%",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
     }
   }
 }

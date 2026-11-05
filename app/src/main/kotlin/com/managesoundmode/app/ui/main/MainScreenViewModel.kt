@@ -206,14 +206,20 @@ class MainScreenViewModel(
     }
   }
 
-  fun onUpsertProfile(profile: SoundProfile, applyImmediately: Boolean) {
+  fun onUpsertProfile(
+    profile: SoundProfile,
+    applyImmediately: Boolean,
+    showFeedback: Boolean = true,
+  ) {
     viewModelScope.launch {
       repository.upsertProfile(profile, applyImmediately = applyImmediately)
         .onSuccess { saved ->
-          feedbackMessage.value = if (applyImmediately) {
-            "Perfil '${saved.name}' salvo e ativado"
-          } else {
-            "Perfil '${saved.name}' atualizado"
+          if (showFeedback) {
+            feedbackMessage.value = if (applyImmediately) {
+              "Perfil '${saved.name}' salvo e ativado"
+            } else {
+              "Perfil '${saved.name}' atualizado"
+            }
           }
         }
         .onFailure { error ->
@@ -231,11 +237,13 @@ class MainScreenViewModel(
     }
   }
 
-  fun onUpsertScheduleRule(rule: ScheduleRule) {
+  fun onUpsertScheduleRule(rule: ScheduleRule, showFeedback: Boolean = true) {
     viewModelScope.launch {
       repository.upsertScheduleRule(rule)
         .onSuccess {
-          feedbackMessage.value = "Horário '${rule.name}' (${rule.formattedWindow()}) salvo"
+          if (showFeedback) {
+            feedbackMessage.value = "Horário '${rule.name}' (${rule.formattedWindow()}) salvo"
+          }
         }
         .onFailure { error ->
           feedbackMessage.value = error.message ?: "Erro ao salvar horário"
@@ -285,11 +293,13 @@ class MainScreenViewModel(
     }
   }
 
-  fun onUpsertLocationRule(rule: LocationRule) {
+  fun onUpsertLocationRule(rule: LocationRule, showFeedback: Boolean = true) {
     viewModelScope.launch {
       repository.upsertLocationRule(rule)
         .onSuccess {
-          feedbackMessage.value = "Local '${rule.name}' salvo"
+          if (showFeedback) {
+            feedbackMessage.value = "Local '${rule.name}' salvo"
+          }
         }
     }
   }
@@ -308,6 +318,19 @@ class MainScreenViewModel(
             "Presença no local simulada • Regra avaliada"
           } else {
             "Saída do local simulada • Modo reavaliado"
+          }
+        }
+    }
+  }
+
+  fun onSyncLocationsWithGps(latitude: Double, longitude: Double) {
+    viewModelScope.launch {
+      repository.syncLocationsWithDeviceCoordinates(latitude, longitude)
+        .onSuccess { matchedCount ->
+          feedbackMessage.value = if (matchedCount > 0) {
+            "GPS sincronizado • Você está dentro de $matchedCount cerca(s) ativa(s)"
+          } else {
+            "GPS sincronizado (${String.format(java.util.Locale.ROOT, "%.4f, %.4f", latitude, longitude)})"
           }
         }
     }
