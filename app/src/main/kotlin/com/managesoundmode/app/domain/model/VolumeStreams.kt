@@ -1,15 +1,18 @@
 package com.managesoundmode.app.domain.model
 
+import com.managesoundmode.app.ui.common.AppLabels
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class VolumeStreamType(
-  val label: String,
-) {
-  RING("Toque (Ring)"),
-  NOTIFICATION("Notificações"),
-  MEDIA("Mídia"),
-  ALARM("Alarme"),
+enum class VolumeStreamType {
+  RING,
+  NOTIFICATION,
+  MEDIA,
+  ALARM,
+  ;
+
+  val label: String
+    get() = AppLabels.Domain.streamTypeLabel(this)
 }
 
 @Serializable

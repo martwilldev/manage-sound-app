@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.CancellationSignal
 import androidx.core.content.ContextCompat
@@ -50,6 +51,27 @@ object LocationProximityHelper {
       Manifest.permission.ACCESS_COARSE_LOCATION,
     ) == PackageManager.PERMISSION_GRANTED
     return fine || coarse
+  }
+
+  fun readConnectedWifiSsid(context: Context): String? =
+    runCatching {
+      val wifiManager =
+        context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+          ?: return@runCatching null
+      @Suppress("DEPRECATION")
+      val rawSsid = wifiManager.connectionInfo?.ssid ?: return@runCatching null
+      val cleaned = rawSsid.trim().removeSurrounding("\"")
+      if (cleaned.isBlank() || cleaned.equals("<unknown ssid>", ignoreCase = true)) {
+        null
+      } else {
+        cleaned
+      }
+    }.getOrNull()
+
+  fun matchesWifiSsid(ruleWifiSsid: String?, connectedWifiSsid: String?): Boolean {
+    val target = ruleWifiSsid?.trim()?.removeSurrounding("\"")?.takeIf { it.isNotEmpty() } ?: return false
+    val current = connectedWifiSsid?.trim()?.removeSurrounding("\"")?.takeIf { it.isNotEmpty() } ?: return false
+    return target.equals(current, ignoreCase = true)
   }
 
   /**

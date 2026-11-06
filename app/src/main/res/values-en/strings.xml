@@ -1,0 +1,42 @@
+<resources>
+    <!-- Product Identity & System -->
+    <string name="app_name">Sound Modes</string>
+    <string name="widget_description">Switch between Sound, Vibrate, Silent and Profiles in 1 tap right from your home screen.</string>
+
+    <!-- Android Header Quick Settings Tiles Labels -->
+    <string name="qs_tile_cycle_label">Sound Mode (Cycle)</string>
+    <string name="qs_tile_normal_label">Mode: Sound</string>
+    <string name="qs_tile_vibrate_label">Mode: Vibrate</string>
+    <string name="qs_tile_silent_label">Mode: Silent</string>
+    <string name="qs_tile_profile_1_label">Quick Profile 1</string>
+    <string name="qs_tile_profile_2_label">Quick Profile 2</string>
+    <string name="qs_tile_timer_label">Silent Timer</string>
+    <string name="qs_tile_media_mute_label">Zero Media</string>
+
+    <!-- Main Navigation (5 Tabs) -->
+    <string name="tab_now_label">Now</string>
+    <string name="tab_now_title">Sound Modes</string>
+    <string name="tab_profiles_label">Profiles</string>
+    <string name="tab_profiles_title">Profiles</string>
+    <string name="tab_schedules_label">Schedules</string>
+    <string name="tab_schedules_title">Schedules</string>
+    <string name="tab_locations_label">Locations</string>
+    <string name="tab_locations_title">Locations</string>
+    <string name="tab_settings_label">Settings</string>
+    <string name="tab_settings_title">Settings</string>
+
+    <!-- Common Actions -->
+    <string name="action_back">Back</string>
+    <string name="action_create">Create</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_ok">OK</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_allow">Allow</string>
+    <string name="action_clear">Clear</string>
+    <string name="label_auto_saved">Saved automatically</string>
+
+    <!-- FABs -->
+    <string name="fab_new_profile">New Profile</string>
+    <string name="fab_new_schedule">New Schedule</string>
+    <string name="fab_new_location">New Location</string>
+</resources>

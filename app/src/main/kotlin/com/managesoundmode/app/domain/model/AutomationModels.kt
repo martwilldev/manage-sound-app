@@ -1,22 +1,28 @@
 package com.managesoundmode.app.domain.model
 
+import com.managesoundmode.app.ui.common.AppLabels
 import java.time.DayOfWeek
 import java.util.Locale
 import kotlinx.serialization.Serializable
 
 @Serializable
 enum class Weekday(
-  val shortLabel: String,
-  val fullLabel: String,
   val isoDayNumber: Int,
 ) {
-  SUN(shortLabel = "D", fullLabel = "Dom", isoDayNumber = 7),
-  MON(shortLabel = "S", fullLabel = "Seg", isoDayNumber = 1),
-  TUE(shortLabel = "T", fullLabel = "Ter", isoDayNumber = 2),
-  WED(shortLabel = "Q", fullLabel = "Qua", isoDayNumber = 3),
-  THU(shortLabel = "Q", fullLabel = "Qui", isoDayNumber = 4),
-  FRI(shortLabel = "S", fullLabel = "Sex", isoDayNumber = 5),
-  SAT(shortLabel = "S", fullLabel = "Sáb", isoDayNumber = 6);
+  SUN(isoDayNumber = 7),
+  MON(isoDayNumber = 1),
+  TUE(isoDayNumber = 2),
+  WED(isoDayNumber = 3),
+  THU(isoDayNumber = 4),
+  FRI(isoDayNumber = 5),
+  SAT(isoDayNumber = 6),
+  ;
+
+  val shortLabel: String
+    get() = AppLabels.Domain.weekdayShortLabel(this)
+
+  val fullLabel: String
+    get() = AppLabels.Domain.weekdayFullLabel(this)
 
   companion object {
     fun fromDayOfWeek(dayOfWeek: DayOfWeek): Weekday =
@@ -61,13 +67,7 @@ data class ScheduleRule(
 
   fun formattedWindow(): String = "${formattedStart()} – ${formattedEnd()}"
 
-  fun formattedDaysSummary(): String {
-    if (daysOfWeek.size == 7) return "Todos os dias"
-    if (daysOfWeek == Weekday.weekdays) return "Seg a Sex"
-    if (daysOfWeek == Weekday.sleepWeeknights) return "Dom a Qui"
-    if (daysOfWeek == setOf(Weekday.SAT, Weekday.SUN)) return "Fim de semana"
-    return Weekday.entries.filter { it in daysOfWeek }.joinToString(", ") { it.fullLabel }
-  }
+  fun formattedDaysSummary(): String = AppLabels.Domain.daysSummary(daysOfWeek)
 
   companion object {
     val defaultSchedules: List<ScheduleRule> = listOf(
@@ -116,6 +116,9 @@ data class LocationRule(
     require(radiusMeters in 100..2000) { "Raio deve estar entre 100m e 2000m" }
   }
 
+  val hasCoordinates: Boolean
+    get() = !latitude.isNaN() && !longitude.isNaN() && (latitude != 0.0 || longitude != 0.0)
+
   fun formattedCoordinates(): String =
     String.format(Locale.ROOT, "%.4f, %.4f", latitude, longitude)
 
@@ -148,27 +151,27 @@ data class LocationRule(
 }
 
 @Serializable
-enum class ThemeMode(
-  val label: String,
-) {
-  SYSTEM("Sistema"),
-  LIGHT("Claro"),
-  DARK("Escuro"),
+enum class ThemeMode {
+  SYSTEM,
+  LIGHT,
+  DARK,
+  ;
+
+  val label: String
+    get() = AppLabels.Domain.themeModeLabel(this)
 }
 
 @Serializable
-enum class RestorePolicy(
-  val title: String,
-  val subtitle: String,
-) {
-  DEFAULT_PROFILE(
-    title = "Perfil Padrão do Dia",
-    subtitle = "Garante retorno ao perfil base (Som Ativo) ao encerrar qualquer período",
-  ),
-  SNAPSHOT(
-    title = "Último Estado Manual (Snapshot)",
-    subtitle = "Restaura exatamente o modo e os volumes que estavam antes da regra iniciar",
-  ),
+enum class RestorePolicy {
+  DEFAULT_PROFILE,
+  SNAPSHOT,
+  ;
+
+  val title: String
+    get() = AppLabels.Domain.restorePolicyTitle(this)
+
+  val subtitle: String
+    get() = AppLabels.Domain.restorePolicySubtitle(this)
 }
 
 @Serializable
@@ -179,19 +182,21 @@ data class SavedStateSnapshot(
 )
 
 @Serializable
-enum class TransitionTriggerSource(
-  val badgeLabel: String,
-) {
-  MANUAL("Manual"),
-  TIMER("Timer"),
-  SCHEDULE("Horário"),
-  LOCATION("Local"),
-  RESTORE("Auto-Restore"),
-  BOOT("Sistema / Boot"),
-  QUICK_TILE("Atalho Rápido"),
-  NOTIFICATION("Notificação"),
-  WIDGET("Widget"),
-  HARDWARE_BUTTON("Botão de Volume"),
+enum class TransitionTriggerSource {
+  MANUAL,
+  TIMER,
+  SCHEDULE,
+  LOCATION,
+  RESTORE,
+  BOOT,
+  QUICK_TILE,
+  NOTIFICATION,
+  WIDGET,
+  HARDWARE_BUTTON,
+  ;
+
+  val badgeLabel: String
+    get() = AppLabels.Domain.triggerSourceBadge(this)
 }
 
 @Serializable

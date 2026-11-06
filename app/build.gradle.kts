@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+}
+
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+  if (keystorePropsFile.exists()) {
+    keystorePropsFile.inputStream().use { load(it) }
+  }
 }
 
 android {
@@ -25,12 +34,25 @@ android {
       enableV3Signing = true
     }
     create("release") {
-      val keystoreFile = file("keystore/manage-sound-release.jks")
+      val configuredStorePath =
+        keystoreProps.getProperty("storeFile")
+          ?: System.getenv("RELEASE_STORE_FILE")
+          ?: "keystore/manage-sound-release.jks"
+      val keystoreFile = file(configuredStorePath)
       if (keystoreFile.exists()) {
         storeFile = keystoreFile
-        storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: "change_me_in_production"
-        keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "managesoundmode"
-        keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "change_me_in_production"
+        storePassword =
+          keystoreProps.getProperty("storePassword")
+            ?: System.getenv("RELEASE_STORE_PASSWORD")
+            ?: "change_me_in_production"
+        keyAlias =
+          keystoreProps.getProperty("keyAlias")
+            ?: System.getenv("RELEASE_KEY_ALIAS")
+            ?: "managesoundmode"
+        keyPassword =
+          keystoreProps.getProperty("keyPassword")
+            ?: System.getenv("RELEASE_KEY_PASSWORD")
+            ?: "change_me_in_production"
       } else {
         initWith(getByName("debug"))
       }

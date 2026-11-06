@@ -83,6 +83,8 @@ import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.domain.model.VolumeStreamType
 import com.managesoundmode.app.domain.model.VolumeStreams
+import com.managesoundmode.app.ui.common.AppLabels
+import com.managesoundmode.app.ui.common.AppTestTags
 import kotlin.math.roundToInt
 
 /**
@@ -232,7 +234,7 @@ fun PillVolumeSliderRow(
       valueRange = 0f..100f,
       modifier = Modifier
         .fillMaxWidth()
-        .testTag("slider_${type.name}"),
+        .testTag(AppTestTags.Now.streamSlider(type)),
     )
   }
 }
@@ -278,17 +280,12 @@ fun ProfileEditorBottomSheet(
     mutableStateOf(initialProfile?.skipMediaOnBluetooth ?: true)
   }
 
-  val iconOptions = listOf(
-    "work" to "Trabalho",
-    "bedtime" to "Dormir",
-    "vibration" to "Reunião",
-    "home" to "Casa",
-    "sunny" to "Dia",
-    "shield" to "Foco",
-  )
+  val iconOptions = AppLabels.Profiles.iconOptions()
 
   fun buildProfile(): SoundProfile {
-    val resolvedName = name.trim().ifEmpty { initialProfile?.name ?: "Novo Perfil" }
+    val resolvedName = name.trim().ifEmpty {
+      initialProfile?.name ?: AppLabels.Profiles.newProfileTitle
+    }
     val streams = VolumeStreams(
       ringPercent = ringPercent,
       notificationPercent = notifPercent,
@@ -298,9 +295,8 @@ fun ProfileEditorBottomSheet(
     return SoundProfile(
       id = initialProfile?.id ?: "custom_${System.currentTimeMillis()}",
       name = resolvedName,
-      description = initialProfile?.description ?: streams.let {
-        "Toque ${it.ringPercent}% • Mídia ${it.mediaPercent}%"
-      },
+      description = initialProfile?.description
+        ?: AppLabels.Profiles.defaultStreamsDescription(streams),
       mode = selectedMode,
       streams = streams,
       isPreset = initialProfile?.isPreset ?: false,
@@ -341,14 +337,18 @@ fun ProfileEditorBottomSheet(
             ) {
               Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Voltar",
+                contentDescription = AppLabels.Common.back,
               )
             }
           },
           title = {
             Column {
               Text(
-                text = if (isEditing) "Editar Perfil" else "Novo Perfil",
+                text = if (isEditing) {
+                  AppLabels.Profiles.editProfileTitle
+                } else {
+                  AppLabels.Profiles.newProfileTitle
+                },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -356,7 +356,7 @@ fun ProfileEditorBottomSheet(
               )
               if (isEditing) {
                 Text(
-                  text = "Salvo automaticamente",
+                  text = AppLabels.Common.autoSavedSubtitle,
                   style = MaterialTheme.typography.labelSmall,
                   color = MaterialTheme.colorScheme.primary,
                 )
@@ -367,11 +367,11 @@ fun ProfileEditorBottomSheet(
             if (isEditing && onDeleteProfile != null) {
               IconButton(
                 onClick = { onDeleteProfile(initialProfile.id) },
-                modifier = Modifier.testTag("delete_profile_top_button"),
+                modifier = Modifier.testTag(AppTestTags.Profiles.DELETE_TOP_BUTTON),
               ) {
                 Icon(
                   imageVector = Icons.Default.DeleteOutline,
-                  contentDescription = "Excluir perfil",
+                  contentDescription = AppLabels.Profiles.deleteProfileMenu,
                   tint = MaterialTheme.colorScheme.error,
                 )
               }
@@ -379,9 +379,9 @@ fun ProfileEditorBottomSheet(
               TextButton(
                 onClick = { onSaveProfile(buildProfile(), false) },
                 enabled = name.trim().isNotEmpty(),
-                modifier = Modifier.testTag("confirm_save_profile_button"),
+                modifier = Modifier.testTag(AppTestTags.Profiles.CONFIRM_SAVE_BUTTON),
               ) {
-                Text("Criar", fontWeight = FontWeight.Bold)
+                Text(AppLabels.Common.create, fontWeight = FontWeight.Bold)
               }
             }
           },
@@ -463,17 +463,17 @@ fun ProfileEditorBottomSheet(
             name = it
             notifyAutoSaveIfEditing()
           },
-          label = { Text("Nome do perfil") },
+          label = { Text(AppLabels.Profiles.profileNameLabel) },
           singleLine = true,
           shape = RoundedCornerShape(16.dp),
           modifier = Modifier
             .fillMaxWidth()
-            .testTag("profile_name_input"),
+            .testTag(AppTestTags.Profiles.NAME_INPUT),
         )
 
         // Modo de Toque do Perfil (SegmentedButton nativo M3)
         Text(
-          text = "Modo de toque",
+          text = AppLabels.Profiles.baseSoundModeSectionTitle,
           style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -495,11 +495,7 @@ fun ProfileEditorBottomSheet(
               },
             ) {
               Text(
-                text = when (mode) {
-                  SoundMode.NORMAL -> "Som"
-                  SoundMode.VIBRATE -> "Vibrar"
-                  SoundMode.SILENT -> "Silêncio"
-                },
+                text = AppLabels.Now.modeShortPill(mode),
                 maxLines = 1,
                 softWrap = false,
               )
@@ -519,7 +515,7 @@ fun ProfileEditorBottomSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp),
           ) {
             Text(
-              text = "Volumes salvos neste perfil",
+              text = AppLabels.Profiles.channelsVolumeSectionTitle,
               style = MaterialTheme.typography.titleSmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -571,7 +567,7 @@ fun ProfileEditorBottomSheet(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Text(
-            text = "Preservar mídia se música estiver tocando",
+            text = AppLabels.Profiles.preserveMediaTitle,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier
               .weight(1f)
@@ -592,7 +588,7 @@ fun ProfileEditorBottomSheet(
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Text(
-            text = "Não alterar mídia com fone Bluetooth",
+            text = AppLabels.Profiles.skipBluetoothTitle,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier
               .weight(1f)
@@ -621,7 +617,7 @@ fun ProfileEditorBottomSheet(
                 .weight(1f)
                 .height(50.dp),
             ) {
-              Text("Criar Perfil")
+              Text(AppLabels.Profiles.createOnlyButton)
             }
             Button(
               onClick = { onSaveProfile(buildProfile(), true) },
@@ -630,7 +626,7 @@ fun ProfileEditorBottomSheet(
                 .weight(1f)
                 .height(50.dp),
             ) {
-              Text("Criar e Ativar")
+              Text(AppLabels.Profiles.saveAndActivateButton)
             }
           }
         } else {
@@ -640,7 +636,7 @@ fun ProfileEditorBottomSheet(
               .fillMaxWidth()
               .height(50.dp),
           ) {
-            Text("Ativar Este Perfil Agora")
+            Text(AppLabels.Profiles.applyNowButton)
           }
         }
       }
@@ -667,14 +663,14 @@ fun ProminentLocationDisclosureDialog(
     },
     title = {
       Text(
-        text = "Automação por Localização (100% On-Device)",
+        text = AppLabels.Disclosure.title,
         style = MaterialTheme.typography.titleLarge,
       )
     },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-          text = "O Modos de Som coleta dados de localização em segundo plano para ativar e desativar automaticamente seus perfis de som (Silencioso, Vibrar ou Volume Alto) quando você entra ou sai dos locais configurados, mesmo quando o aplicativo está fechado ou não está em uso.",
+          text = AppLabels.Disclosure.body,
           style = MaterialTheme.typography.bodyMedium,
         )
         Surface(
@@ -692,7 +688,7 @@ fun ProminentLocationDisclosureDialog(
               tint = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Text(
-              text = "Privacidade Total: Suas coordenadas ficam salvas exclusivamente no seu aparelho. Nenhum dado de GPS é enviado para servidores.",
+              text = AppLabels.Disclosure.privacyHighlight,
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -703,14 +699,14 @@ fun ProminentLocationDisclosureDialog(
     confirmButton = {
       Button(
         onClick = onAcceptAndContinue,
-        modifier = Modifier.testTag("accept_location_disclosure_button"),
+        modifier = Modifier.testTag(AppTestTags.Locations.ACCEPT_DISCLOSURE_BUTTON),
       ) {
-        Text("Entendi e Continuar")
+        Text(AppLabels.Disclosure.acceptButton)
       }
     },
     dismissButton = {
       TextButton(onClick = onDismiss) {
-        Text("Agora não")
+        Text(AppLabels.Disclosure.dismissButton)
       }
     },
   )

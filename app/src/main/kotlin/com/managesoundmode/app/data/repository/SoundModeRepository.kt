@@ -5,6 +5,7 @@ import com.managesoundmode.app.data.local.SoundPreferencesDataSource
 import com.managesoundmode.app.data.system.SoundSystemController
 import com.managesoundmode.app.domain.engine.RuleEvaluationDecision
 import com.managesoundmode.app.domain.engine.RuleEvaluator
+import com.managesoundmode.app.domain.model.AccessControlConfig
 import com.managesoundmode.app.domain.model.DeviceSoundSnapshot
 import com.managesoundmode.app.domain.model.LocationRule
 import com.managesoundmode.app.domain.model.RestorePolicy
@@ -17,6 +18,8 @@ import com.managesoundmode.app.domain.model.TimedModeSession
 import com.managesoundmode.app.domain.model.TransitionLogEntry
 import com.managesoundmode.app.domain.model.TransitionTriggerSource
 import com.managesoundmode.app.domain.model.VolumeStreamType
+import com.managesoundmode.app.system.BackgroundGeofenceManager
+import com.managesoundmode.app.system.GeofencePresenceDecision
 import com.managesoundmode.app.system.LocationProximityHelper
 import java.time.Instant
 import java.time.LocalDateTime
@@ -75,6 +78,26 @@ interface SoundModeRepository {
   suspend fun setQuickTileSlotProfileId(slotIndex: Int, profileId: String): Result<Unit>
   suspend fun toggleQuickMediaMute(): Result<Int>
   suspend fun clearTransitionLogs(): Result<Unit>
+  suspend fun setAppLanguageCode(languageCode: String): Result<Unit>
+  suspend fun setAutomationsPaused(paused: Boolean): Result<Unit>
+  suspend fun setHapticFeedbackEnabled(enabled: Boolean): Result<Unit>
+  suspend fun setNotifyOnAutoTransition(enabled: Boolean): Result<Unit>
+  suspend fun setDefaultTimerMinutes(minutes: Int): Result<Unit>
+  suspend fun setOnboardingCompleted(completed: Boolean): Result<Unit>
+  suspend fun setAccessControlConfig(config: AccessControlConfig): Result<Unit> = Result.success(Unit)
+  suspend fun setSystemZenRulesEnabled(enabled: Boolean): Result<Unit> = Result.success(Unit)
+  suspend fun syncSystemZenRulesNow(): Result<Int> = Result.success(0)
+  suspend fun syncBackgroundGeofencesNow(): Result<Int> = Result.success(0)
+  suspend fun processBackgroundGeofenceSignal(
+    latitude: Double?,
+    longitude: Double?,
+    connectedWifiSsid: String?,
+    nowEpochMillis: Long = System.currentTimeMillis(),
+    dwellDurationMillis: Long = BackgroundGeofenceManager.DEFAULT_DWELL_DURATION_MILLIS,
+  ): Result<Int> = Result.success(0)
+  suspend fun resetFactoryDefaults(): Result<Unit>
+  suspend fun exportBackupJson(): Result<String>
+  suspend fun importBackupJson(rawJson: String): Result<Unit>
 
   suspend fun reapplyActiveRule(): Result<Unit>
   suspend fun evaluateAndApplyRules(
@@ -96,6 +119,16 @@ class DefaultSoundModeRepository(
   private val onSyncActiveTimerNotification: (session: TimedModeSession?) -> Unit = {},
   private val onRuleOverrideAlert: (ruleName: String) -> Unit = {},
   private val onRefreshExternalSurfaces: suspend () -> Unit = {},
+  private val onSyncSystemZenRules: (
+    profiles: List<SoundProfile>,
+    activeProfileId: String?,
+    enabled: Boolean,
+  ) -> Int = { profiles, _, enabled -> if (enabled) profiles.size else 0 },
+  private val onSyncGeofenceRegistrations: (
+    locationRules: List<LocationRule>,
+    automationsPaused: Boolean,
+  ) -> Int = { rules, paused -> if (paused) 0 else rules.count { it.enabled && it.hasCoordinates } },
+  private val onScheduleGeofenceDwellCheck: (delayMillis: Long) -> Unit = {},
   private val clockNowMillis: () -> Long = { System.currentTimeMillis() },
 ) : SoundModeRepository {
 
@@ -125,8 +158,8 @@ class DefaultSoundModeRepository(
       nowDateTime = nowDateTime,
       nowEpochMillis = nowMillis,
       profiles = allProfiles,
-      scheduleRules = prefs.scheduleRules,
-      locationRules = prefs.locationRules,
+      scheduleRules = if (prefs.automationsPaused) emptyList() else prefs.scheduleRules,
+      locationRules = if (prefs.automationsPaused) emptyList() else prefs.locationRules,
       activeTimer = prefs.activeTimer,
       overriddenSessionKey = prefs.overriddenSessionKey,
       restorePolicy = prefs.restorePolicy,
@@ -154,8 +187,12 @@ class DefaultSoundModeRepository(
         true,
       )
       is RuleEvaluationDecision.NoActiveRules -> Quadruple(
-        null,
-        "Padrão do Sistema • Nenhuma automação restritiva no momento",
+        if (prefs.automationsPaused) "Automações Pausadas (Modo Férias)" else null,
+        if (prefs.automationsPaused) {
+          "Rotinas de horário e localização temporariamente suspensas"
+        } else {
+          "Padrão do Sistema • Nenhuma automação restritiva no momento"
+        },
         null,
         false,
       )
@@ -455,6 +492,8 @@ class DefaultSoundModeRepository(
     } else if (rule.enabled && rule.isCurrentlyInside) {
       preferencesDataSource.setLastAppliedRuleSessionKey(null)
     }
+    val updatedPrefs = preferencesDataSource.prefsFlow.first()
+    onSyncGeofenceRegistrations(updatedPrefs.locationRules, updatedPrefs.automationsPaused)
     evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
     onRefreshExternalSurfaces()
     refreshSystemState()
@@ -468,6 +507,8 @@ class DefaultSoundModeRepository(
     if (wasPreviouslyActive) {
       preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_$ruleId")
     }
+    val updatedPrefs = preferencesDataSource.prefsFlow.first()
+    onSyncGeofenceRegistrations(updatedPrefs.locationRules, updatedPrefs.automationsPaused)
     evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION)
     onRefreshExternalSurfaces()
     refreshSystemState()
@@ -528,6 +569,81 @@ class DefaultSoundModeRepository(
       refreshSystemState()
     }
     matchedCount
+  }
+
+  override suspend fun syncBackgroundGeofencesNow(): Result<Int> = runCatching {
+    val prefs = preferencesDataSource.prefsFlow.first()
+    onSyncGeofenceRegistrations(prefs.locationRules, prefs.automationsPaused)
+  }
+
+  override suspend fun processBackgroundGeofenceSignal(
+    latitude: Double?,
+    longitude: Double?,
+    connectedWifiSsid: String?,
+    nowEpochMillis: Long,
+    dwellDurationMillis: Long,
+  ): Result<Int> = runCatching {
+    val prefs = preferencesDataSource.prefsFlow.first()
+    if (prefs.automationsPaused) return@runCatching 0
+
+    var insideConfirmedCount = 0
+    var stateChanged = false
+    var exitedRuleId: String? = null
+    var minPendingDwellMillis: Long? = null
+
+    for (rule in prefs.locationRules) {
+      val decision = BackgroundGeofenceManager.evaluatePresenceWithDwell(
+        rule = rule,
+        latitude = latitude,
+        longitude = longitude,
+        connectedWifiSsid = connectedWifiSsid,
+        nowEpochMillis = nowEpochMillis,
+        dwellDurationMillis = dwellDurationMillis,
+      )
+      when (decision) {
+        is GeofencePresenceDecision.ConfirmedInside -> {
+          if (rule.enabled) {
+            insideConfirmedCount++
+          }
+          if (!rule.isCurrentlyInside) {
+            stateChanged = true
+            preferencesDataSource.upsertLocationRule(rule.copy(isCurrentlyInside = true))
+          }
+        }
+        is GeofencePresenceDecision.PendingDwell -> {
+          val currentMin = minPendingDwellMillis
+          minPendingDwellMillis = if (currentMin == null) {
+            decision.remainingMillis
+          } else {
+            minOf(currentMin, decision.remainingMillis)
+          }
+        }
+        GeofencePresenceDecision.ConfirmedOutside -> {
+          if (rule.isCurrentlyInside) {
+            stateChanged = true
+            exitedRuleId = rule.id
+            preferencesDataSource.upsertLocationRule(rule.copy(isCurrentlyInside = false))
+          }
+        }
+      }
+    }
+
+    if (minPendingDwellMillis != null) {
+      onScheduleGeofenceDwellCheck(minPendingDwellMillis)
+    }
+
+    if (stateChanged) {
+      preferencesDataSource.setOverriddenSessionKey(null)
+      if (insideConfirmedCount == 0 && exitedRuleId != null && prefs.lastAppliedRuleSessionKey?.contains(exitedRuleId) == true) {
+        preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_$exitedRuleId")
+      } else if (insideConfirmedCount > 0) {
+        preferencesDataSource.setLastAppliedRuleSessionKey(null)
+      }
+      evaluateAndApplyRules(source = TransitionTriggerSource.LOCATION, nowEpochMillis = nowEpochMillis)
+      onRefreshExternalSurfaces()
+      refreshSystemState()
+    }
+    insideConfirmedCount
   }
 
   override suspend fun setRestorePolicy(policy: RestorePolicy): Result<Unit> = runCatching {
@@ -633,6 +749,105 @@ class DefaultSoundModeRepository(
     refreshSystemState()
   }
 
+  override suspend fun setAppLanguageCode(languageCode: String): Result<Unit> = runCatching {
+    preferencesDataSource.setAppLanguageCode(languageCode)
+    refreshSystemState()
+  }
+
+  override suspend fun setAutomationsPaused(paused: Boolean): Result<Unit> = runCatching {
+    val prevPrefs = preferencesDataSource.prefsFlow.first()
+    val wasRuleActive = prevPrefs.lastAppliedRuleSessionKey != null
+    preferencesDataSource.setAutomationsPaused(paused)
+    preferencesDataSource.setOverriddenSessionKey(null)
+    if (paused && wasRuleActive) {
+      preferencesDataSource.setLastAppliedRuleSessionKey("force_restore_vacation_mode")
+    } else if (!paused) {
+      preferencesDataSource.setLastAppliedRuleSessionKey(null)
+    }
+    val updatedPrefs = preferencesDataSource.prefsFlow.first()
+    onSyncGeofenceRegistrations(updatedPrefs.locationRules, updatedPrefs.automationsPaused)
+    evaluateAndApplyRules(source = TransitionTriggerSource.MANUAL)
+    onRefreshExternalSurfaces()
+    refreshSystemState()
+  }
+
+  override suspend fun setHapticFeedbackEnabled(enabled: Boolean): Result<Unit> = runCatching {
+    preferencesDataSource.setHapticFeedbackEnabled(enabled)
+    refreshSystemState()
+  }
+
+  override suspend fun setNotifyOnAutoTransition(enabled: Boolean): Result<Unit> = runCatching {
+    preferencesDataSource.setNotifyOnAutoTransition(enabled)
+    refreshSystemState()
+  }
+
+  override suspend fun setDefaultTimerMinutes(minutes: Int): Result<Unit> = runCatching {
+    preferencesDataSource.setDefaultTimerMinutes(minutes)
+    refreshSystemState()
+  }
+
+  override suspend fun setOnboardingCompleted(completed: Boolean): Result<Unit> = runCatching {
+    preferencesDataSource.setOnboardingCompleted(completed)
+    refreshSystemState()
+  }
+
+  override suspend fun setAccessControlConfig(config: AccessControlConfig): Result<Unit> = runCatching {
+    preferencesDataSource.setAccessControlConfig(config)
+    refreshSystemState()
+  }
+
+  override suspend fun setSystemZenRulesEnabled(enabled: Boolean): Result<Unit> = runCatching {
+    preferencesDataSource.setSystemZenRulesEnabled(enabled)
+    val prefs = preferencesDataSource.prefsFlow.first()
+    val allProfiles = mergeProfiles(prefs.customProfiles, prefs.deletedProfileIds)
+    onSyncSystemZenRules(allProfiles, prefs.activeProfileId, enabled)
+    onRefreshExternalSurfaces()
+    refreshSystemState()
+  }
+
+  override suspend fun syncSystemZenRulesNow(): Result<Int> = runCatching {
+    val prefs = preferencesDataSource.prefsFlow.first()
+    val allProfiles = mergeProfiles(prefs.customProfiles, prefs.deletedProfileIds)
+    onSyncSystemZenRules(allProfiles, prefs.activeProfileId, prefs.systemZenRulesEnabled)
+  }
+
+  override suspend fun resetFactoryDefaults(): Result<Unit> = runCatching {
+    preferencesDataSource.resetFactoryDefaults()
+    val updatedPrefs = preferencesDataSource.prefsFlow.first()
+    val allProfiles = mergeProfiles(updatedPrefs.customProfiles, updatedPrefs.deletedProfileIds)
+    val defaultProfile = allProfiles.firstOrNull { it.id == updatedPrefs.defaultDayProfileId }
+      ?: allProfiles.first()
+    applyProfileToSystem(defaultProfile)
+    preferencesDataSource.setActiveProfileId(defaultProfile.id)
+    onRescheduleRuleAlarms(updatedPrefs.scheduleRules)
+    onSyncGeofenceRegistrations(updatedPrefs.locationRules, updatedPrefs.automationsPaused)
+    onSyncSystemZenRules(allProfiles, defaultProfile.id, updatedPrefs.systemZenRulesEnabled)
+    logTransition(
+      title = "Padrões de fábrica restaurados",
+      detail = "Perfis, horários e locais padrão redefinidos",
+      source = TransitionTriggerSource.MANUAL,
+      mode = defaultProfile.mode,
+    )
+    onRefreshExternalSurfaces()
+    refreshSystemState()
+  }
+
+  override suspend fun exportBackupJson(): Result<String> = runCatching {
+    preferencesDataSource.exportBackupJson()
+  }
+
+  override suspend fun importBackupJson(rawJson: String): Result<Unit> = runCatching {
+    preferencesDataSource.importBackupJson(rawJson)
+    val updatedPrefs = preferencesDataSource.prefsFlow.first()
+    val allProfiles = mergeProfiles(updatedPrefs.customProfiles, updatedPrefs.deletedProfileIds)
+    onRescheduleRuleAlarms(updatedPrefs.scheduleRules)
+    onSyncGeofenceRegistrations(updatedPrefs.locationRules, updatedPrefs.automationsPaused)
+    onSyncSystemZenRules(allProfiles, updatedPrefs.activeProfileId, updatedPrefs.systemZenRulesEnabled)
+    evaluateAndApplyRules(source = TransitionTriggerSource.MANUAL)
+    onRefreshExternalSurfaces()
+    refreshSystemState()
+  }
+
   override suspend fun reapplyActiveRule(): Result<Unit> = runCatching {
     preferencesDataSource.setOverriddenSessionKey(null)
     preferencesDataSource.setLastAppliedRuleSessionKey(null)
@@ -664,8 +879,8 @@ class DefaultSoundModeRepository(
       nowDateTime = nowDateTime,
       nowEpochMillis = nowEpochMillis,
       profiles = allProfiles,
-      scheduleRules = updatedPrefs.scheduleRules,
-      locationRules = updatedPrefs.locationRules,
+      scheduleRules = if (updatedPrefs.automationsPaused) emptyList() else updatedPrefs.scheduleRules,
+      locationRules = if (updatedPrefs.automationsPaused) emptyList() else updatedPrefs.locationRules,
       activeTimer = updatedPrefs.activeTimer,
       overriddenSessionKey = updatedPrefs.overriddenSessionKey,
       restorePolicy = updatedPrefs.restorePolicy,
@@ -879,8 +1094,8 @@ class DefaultSoundModeRepository(
       nowDateTime = nowDateTime,
       nowEpochMillis = nowMillis,
       profiles = allProfiles,
-      scheduleRules = prefs.scheduleRules,
-      locationRules = prefs.locationRules,
+      scheduleRules = if (prefs.automationsPaused) emptyList() else prefs.scheduleRules,
+      locationRules = if (prefs.automationsPaused) emptyList() else prefs.locationRules,
       activeTimer = prefs.activeTimer,
       overriddenSessionKey = null,
       restorePolicy = prefs.restorePolicy,

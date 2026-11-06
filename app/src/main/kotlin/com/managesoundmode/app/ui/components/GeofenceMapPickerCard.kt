@@ -73,6 +73,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.managesoundmode.app.system.AddressSearchResult
+import com.managesoundmode.app.ui.common.AppLabels
+import com.managesoundmode.app.ui.common.AppTestTags
 import java.util.Locale
 
 private class OsmWebMapBridge(
@@ -156,7 +158,7 @@ fun GeofenceMapPickerCard(
   Card(
     modifier = modifier
       .fillMaxWidth()
-      .testTag("geofence_map_picker_card"),
+      .testTag(AppTestTags.GeofenceMap.CARD),
     shape = RoundedCornerShape(24.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -176,12 +178,12 @@ fun GeofenceMapPickerCard(
       ) {
         Column(modifier = Modifier.weight(1f)) {
           Text(
-            text = "Mapa da Cerca Geográfica",
+            text = AppLabels.GeofenceMap.mapCardTitle,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
           )
           Text(
-            text = "Toque no mapa, arraste o pino ou busque o endereço para posicionar o perímetro.",
+            text = AppLabels.GeofenceMap.mapCardSubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -192,7 +194,7 @@ fun GeofenceMapPickerCard(
           enabled = !isFetchingGps,
           shape = RoundedCornerShape(14.dp),
           contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-          modifier = Modifier.testTag("use_current_gps_button"),
+          modifier = Modifier.testTag(AppTestTags.GeofenceMap.USE_CURRENT_GPS_BUTTON),
         ) {
           if (isFetchingGps) {
             CircularProgressIndicator(
@@ -208,7 +210,11 @@ fun GeofenceMapPickerCard(
           }
           Spacer(modifier = Modifier.width(6.dp))
           Text(
-            text = if (isFetchingGps) "Obtendo GPS..." else "Usar GPS atual",
+            text = if (isFetchingGps) {
+              AppLabels.GeofenceMap.fetchingGpsLabel
+            } else {
+              AppLabels.GeofenceMap.useCurrentGpsLabel
+            },
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             softWrap = false,
@@ -227,7 +233,7 @@ fun GeofenceMapPickerCard(
           onValueChange = { searchQuery = it },
           placeholder = {
             Text(
-              text = "Buscar rua, bairro, empresa ou cidade...",
+              text = AppLabels.GeofenceMap.searchPlaceholder,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
             )
@@ -248,7 +254,7 @@ fun GeofenceMapPickerCard(
                 onSearchAddress(searchQuery)
               },
               enabled = searchQuery.trim().length >= 2 && !isSearchingAddress,
-              modifier = Modifier.testTag("search_address_button"),
+              modifier = Modifier.testTag(AppTestTags.GeofenceMap.SEARCH_ADDRESS_BUTTON),
             ) {
               if (isSearchingAddress) {
                 CircularProgressIndicator(
@@ -258,14 +264,14 @@ fun GeofenceMapPickerCard(
               } else {
                 Icon(
                   imageVector = Icons.Default.Search,
-                  contentDescription = "Buscar endereço",
+                  contentDescription = AppLabels.GeofenceMap.searchContentDescription,
                 )
               }
             }
           },
           modifier = Modifier
             .weight(1f)
-            .testTag("search_address_input"),
+            .testTag(AppTestTags.GeofenceMap.SEARCH_ADDRESS_INPUT),
         )
       }
 
@@ -273,7 +279,7 @@ fun GeofenceMapPickerCard(
       if (searchResults.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
           Text(
-            text = "Toque em um endereço para posicionar no mapa:",
+            text = AppLabels.GeofenceMap.searchResultsHint,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
           )
@@ -284,7 +290,7 @@ fun GeofenceMapPickerCard(
               color = MaterialTheme.colorScheme.surfaceContainerHigh,
               modifier = Modifier
                 .fillMaxWidth()
-                .testTag("address_search_result_$idx"),
+                .testTag(AppTestTags.GeofenceMap.searchResult(idx)),
             ) {
               Row(
                 modifier = Modifier
@@ -346,7 +352,7 @@ fun GeofenceMapPickerCard(
         AndroidView(
           modifier = Modifier
             .fillMaxSize()
-            .testTag("osm_interactive_webview"),
+            .testTag(AppTestTags.GeofenceMap.OSM_WEBVIEW),
           factory = { context ->
             WebView(context).apply {
               layoutParams = ViewGroup.LayoutParams(
@@ -420,7 +426,7 @@ fun GeofenceMapPickerCard(
             Box(contentAlignment = Alignment.Center) {
               Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Aproximar mapa",
+                contentDescription = AppLabels.GeofenceMap.zoomInContentDescription,
                 modifier = Modifier.size(18.dp),
               )
             }
@@ -437,7 +443,7 @@ fun GeofenceMapPickerCard(
             Box(contentAlignment = Alignment.Center) {
               Icon(
                 imageVector = Icons.Default.Remove,
-                contentDescription = "Afastar mapa",
+                contentDescription = AppLabels.GeofenceMap.zoomOutContentDescription,
                 modifier = Modifier.size(18.dp),
               )
             }
@@ -461,7 +467,7 @@ fun GeofenceMapPickerCard(
             Box(contentAlignment = Alignment.Center) {
               Icon(
                 imageVector = Icons.Default.CenterFocusStrong,
-                contentDescription = "Centralizar pino",
+                contentDescription = AppLabels.GeofenceMap.recenterContentDescription,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(18.dp),
               )
@@ -490,9 +496,7 @@ fun GeofenceMapPickerCard(
               modifier = Modifier.size(14.dp),
             )
             Text(
-              text = String.format(
-                Locale.ROOT,
-                "%.4f, %.4f • Raio %dm",
+              text = AppLabels.GeofenceMap.coordinatesAndRadiusBadge(
                 latitude,
                 longitude,
                 radiusMeters,

@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.managesoundmode.app.domain.model.AccessControlConfig
 import com.managesoundmode.app.domain.model.LocationRule
 import com.managesoundmode.app.domain.model.RestorePolicy
 import com.managesoundmode.app.domain.model.SavedStateSnapshot
@@ -21,12 +22,40 @@ import com.managesoundmode.app.domain.model.TransitionLogEntry
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 private val Context.soundDataStore: DataStore<Preferences> by preferencesDataStore(
   name = "manage_sound_mode_prefs",
+)
+
+@Serializable
+data class SoundPrefsBackupPayload(
+  val version: Int = 1,
+  val customProfiles: List<SoundProfile> = emptyList(),
+  val deletedProfileIds: Set<String> = emptySet(),
+  val scheduleRules: List<ScheduleRule> = ScheduleRule.defaultSchedules,
+  val locationRules: List<LocationRule> = LocationRule.defaultLocations,
+  val restorePolicy: RestorePolicy = RestorePolicy.DEFAULT_PROFILE,
+  val defaultDayProfileId: String = SoundProfile.DEFAULT_DAY_PROFILE_ID,
+  val useDynamicColor: Boolean = true,
+  val themeMode: ThemeMode = ThemeMode.DARK,
+  val appLanguageCode: String = "PT_BR",
+  val automationsPaused: Boolean = false,
+  val hapticFeedbackEnabled: Boolean = true,
+  val notifyOnAutoTransition: Boolean = true,
+  val defaultTimerMinutes: Int = 30,
+  val muteMediaOnSilent: Boolean = true,
+  val preserveMediaOnBluetooth: Boolean = true,
+  val smartVolumeTriggerEnabled: Boolean = true,
+  val persistentQuickBarEnabled: Boolean = true,
+  val quickTileSlot1ProfileId: String = "preset_work_high",
+  val quickTileSlot2ProfileId: String = "preset_sleep",
+  val accessControlConfig: AccessControlConfig = AccessControlConfig(),
+  val systemZenRulesEnabled: Boolean = true,
 )
 
 data class PersistedSoundPrefs(
@@ -52,6 +81,14 @@ data class PersistedSoundPrefs(
   val quickTileSlot1ProfileId: String = "preset_work_high",
   val quickTileSlot2ProfileId: String = "preset_sleep",
   val savedMediaBeforeMute: Int? = null,
+  val appLanguageCode: String = "PT_BR",
+  val automationsPaused: Boolean = false,
+  val hapticFeedbackEnabled: Boolean = true,
+  val notifyOnAutoTransition: Boolean = true,
+  val defaultTimerMinutes: Int = 30,
+  val hasCompletedOnboarding: Boolean = false,
+  val accessControlConfig: AccessControlConfig = AccessControlConfig(),
+  val systemZenRulesEnabled: Boolean = true,
 )
 
 interface SoundPreferencesDataSource {
@@ -81,6 +118,17 @@ interface SoundPreferencesDataSource {
   suspend fun setQuickTileSlot1ProfileId(profileId: String) {}
   suspend fun setQuickTileSlot2ProfileId(profileId: String) {}
   suspend fun setSavedMediaBeforeMute(percent: Int?) {}
+  suspend fun setAppLanguageCode(languageCode: String) {}
+  suspend fun setAutomationsPaused(paused: Boolean) {}
+  suspend fun setHapticFeedbackEnabled(enabled: Boolean) {}
+  suspend fun setNotifyOnAutoTransition(enabled: Boolean) {}
+  suspend fun setDefaultTimerMinutes(minutes: Int) {}
+  suspend fun setOnboardingCompleted(completed: Boolean) {}
+  suspend fun setAccessControlConfig(config: AccessControlConfig) {}
+  suspend fun setSystemZenRulesEnabled(enabled: Boolean) {}
+  suspend fun resetFactoryDefaults() {}
+  suspend fun exportBackupJson(): String = "{}"
+  suspend fun importBackupJson(rawJson: String) {}
 }
 
 class DataStoreSoundPreferencesDataSource(
@@ -148,6 +196,11 @@ class DataStoreSoundPreferencesDataSource(
           runCatching { ThemeMode.valueOf(raw) }.getOrDefault(ThemeMode.DARK)
         } ?: ThemeMode.DARK
 
+        val accessControlConfig = prefs[KEY_ACCESS_CONTROL_JSON]?.let { raw ->
+          runCatching { json.decodeFromString<AccessControlConfig>(raw) }
+            .getOrDefault(AccessControlConfig())
+        } ?: AccessControlConfig()
+
         PersistedSoundPrefs(
           activeProfileId = activeProfileId,
           activeTimer = activeTimer,
@@ -171,6 +224,14 @@ class DataStoreSoundPreferencesDataSource(
           quickTileSlot1ProfileId = prefs[KEY_QUICK_TILE_SLOT1_PROFILE_ID] ?: "preset_work_high",
           quickTileSlot2ProfileId = prefs[KEY_QUICK_TILE_SLOT2_PROFILE_ID] ?: "preset_sleep",
           savedMediaBeforeMute = prefs[KEY_SAVED_MEDIA_BEFORE_MUTE],
+          appLanguageCode = prefs[KEY_APP_LANGUAGE_CODE] ?: "PT_BR",
+          automationsPaused = prefs[KEY_AUTOMATIONS_PAUSED] ?: false,
+          hapticFeedbackEnabled = prefs[KEY_HAPTIC_FEEDBACK_ENABLED] ?: true,
+          notifyOnAutoTransition = prefs[KEY_NOTIFY_ON_AUTO_TRANSITION] ?: true,
+          defaultTimerMinutes = prefs[KEY_DEFAULT_TIMER_MINUTES] ?: 30,
+          hasCompletedOnboarding = prefs[KEY_HAS_COMPLETED_ONBOARDING] ?: false,
+          accessControlConfig = accessControlConfig,
+          systemZenRulesEnabled = prefs[KEY_SYSTEM_ZEN_RULES_ENABLED] ?: true,
         )
       }
 
@@ -402,6 +463,136 @@ class DataStoreSoundPreferencesDataSource(
     }
   }
 
+  override suspend fun setAppLanguageCode(languageCode: String) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_APP_LANGUAGE_CODE] = languageCode
+    }
+  }
+
+  override suspend fun setAutomationsPaused(paused: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_AUTOMATIONS_PAUSED] = paused
+    }
+  }
+
+  override suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_HAPTIC_FEEDBACK_ENABLED] = enabled
+    }
+  }
+
+  override suspend fun setNotifyOnAutoTransition(enabled: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_NOTIFY_ON_AUTO_TRANSITION] = enabled
+    }
+  }
+
+  override suspend fun setDefaultTimerMinutes(minutes: Int) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_DEFAULT_TIMER_MINUTES] = minutes.coerceIn(5, 720)
+    }
+  }
+
+  override suspend fun setOnboardingCompleted(completed: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_HAS_COMPLETED_ONBOARDING] = completed
+    }
+  }
+
+  override suspend fun setAccessControlConfig(config: AccessControlConfig) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_ACCESS_CONTROL_JSON] = json.encodeToString(config)
+    }
+  }
+
+  override suspend fun setSystemZenRulesEnabled(enabled: Boolean) {
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_SYSTEM_ZEN_RULES_ENABLED] = enabled
+    }
+  }
+
+  override suspend fun resetFactoryDefaults() {
+    context.soundDataStore.edit { prefs ->
+      prefs.remove(KEY_CUSTOM_PROFILES_JSON)
+      prefs.remove(KEY_DELETED_PROFILE_IDS_JSON)
+      prefs.remove(KEY_SCHEDULE_RULES_JSON)
+      prefs.remove(KEY_LOCATION_RULES_JSON)
+      prefs[KEY_RESTORE_POLICY] = RestorePolicy.DEFAULT_PROFILE.name
+      prefs[KEY_DEFAULT_DAY_PROFILE_ID] = SoundProfile.DEFAULT_DAY_PROFILE_ID
+      prefs.remove(KEY_SAVED_SNAPSHOT_JSON)
+      prefs.remove(KEY_LAST_APPLIED_RULE_SESSION_KEY)
+      prefs.remove(KEY_OVERRIDDEN_SESSION_KEY)
+      prefs[KEY_AUTOMATIONS_PAUSED] = false
+      prefs[KEY_MUTE_MEDIA_ON_SILENT] = true
+      prefs[KEY_PRESERVE_MEDIA_ON_BT] = true
+      prefs[KEY_SMART_VOLUME_TRIGGER] = true
+      prefs[KEY_PERSISTENT_QUICK_BAR] = true
+      prefs[KEY_HAPTIC_FEEDBACK_ENABLED] = true
+      prefs[KEY_NOTIFY_ON_AUTO_TRANSITION] = true
+      prefs[KEY_DEFAULT_TIMER_MINUTES] = 30
+      prefs[KEY_QUICK_TILE_SLOT1_PROFILE_ID] = "preset_work_high"
+      prefs[KEY_QUICK_TILE_SLOT2_PROFILE_ID] = "preset_sleep"
+      prefs.remove(KEY_ACCESS_CONTROL_JSON)
+      prefs[KEY_SYSTEM_ZEN_RULES_ENABLED] = true
+    }
+  }
+
+  override suspend fun exportBackupJson(): String {
+    val current = prefsFlow.first()
+    val payload = SoundPrefsBackupPayload(
+      version = 1,
+      customProfiles = current.customProfiles,
+      deletedProfileIds = current.deletedProfileIds,
+      scheduleRules = current.scheduleRules,
+      locationRules = current.locationRules,
+      restorePolicy = current.restorePolicy,
+      defaultDayProfileId = current.defaultDayProfileId,
+      useDynamicColor = current.useDynamicColor,
+      themeMode = current.themeMode,
+      appLanguageCode = current.appLanguageCode,
+      automationsPaused = current.automationsPaused,
+      hapticFeedbackEnabled = current.hapticFeedbackEnabled,
+      notifyOnAutoTransition = current.notifyOnAutoTransition,
+      defaultTimerMinutes = current.defaultTimerMinutes,
+      muteMediaOnSilent = current.muteMediaOnSilent,
+      preserveMediaOnBluetooth = current.preserveMediaOnBluetooth,
+      smartVolumeTriggerEnabled = current.smartVolumeTriggerEnabled,
+      persistentQuickBarEnabled = current.persistentQuickBarEnabled,
+      quickTileSlot1ProfileId = current.quickTileSlot1ProfileId,
+      quickTileSlot2ProfileId = current.quickTileSlot2ProfileId,
+      accessControlConfig = current.accessControlConfig,
+      systemZenRulesEnabled = current.systemZenRulesEnabled,
+    )
+    return json.encodeToString(payload)
+  }
+
+  override suspend fun importBackupJson(rawJson: String) {
+    val payload = json.decodeFromString<SoundPrefsBackupPayload>(rawJson.trim())
+    context.soundDataStore.edit { prefs ->
+      prefs[KEY_CUSTOM_PROFILES_JSON] = json.encodeToString(payload.customProfiles)
+      prefs[KEY_DELETED_PROFILE_IDS_JSON] = json.encodeToString(payload.deletedProfileIds)
+      prefs[KEY_SCHEDULE_RULES_JSON] = json.encodeToString(payload.scheduleRules)
+      prefs[KEY_LOCATION_RULES_JSON] = json.encodeToString(payload.locationRules)
+      prefs[KEY_RESTORE_POLICY] = payload.restorePolicy.name
+      prefs[KEY_DEFAULT_DAY_PROFILE_ID] = payload.defaultDayProfileId
+      prefs[KEY_USE_DYNAMIC_COLOR] = payload.useDynamicColor
+      prefs[KEY_THEME_MODE] = payload.themeMode.name
+      prefs[KEY_APP_LANGUAGE_CODE] = payload.appLanguageCode
+      prefs[KEY_AUTOMATIONS_PAUSED] = payload.automationsPaused
+      prefs[KEY_HAPTIC_FEEDBACK_ENABLED] = payload.hapticFeedbackEnabled
+      prefs[KEY_NOTIFY_ON_AUTO_TRANSITION] = payload.notifyOnAutoTransition
+      prefs[KEY_DEFAULT_TIMER_MINUTES] = payload.defaultTimerMinutes.coerceIn(5, 720)
+      prefs[KEY_MUTE_MEDIA_ON_SILENT] = payload.muteMediaOnSilent
+      prefs[KEY_PRESERVE_MEDIA_ON_BT] = payload.preserveMediaOnBluetooth
+      prefs[KEY_SMART_VOLUME_TRIGGER] = payload.smartVolumeTriggerEnabled
+      prefs[KEY_PERSISTENT_QUICK_BAR] = payload.persistentQuickBarEnabled
+      prefs[KEY_QUICK_TILE_SLOT1_PROFILE_ID] = payload.quickTileSlot1ProfileId
+      prefs[KEY_QUICK_TILE_SLOT2_PROFILE_ID] = payload.quickTileSlot2ProfileId
+      prefs[KEY_ACCESS_CONTROL_JSON] = json.encodeToString(payload.accessControlConfig)
+      prefs[KEY_SYSTEM_ZEN_RULES_ENABLED] = payload.systemZenRulesEnabled
+    }
+  }
+
   private companion object {
     const val TAG = "SoundPrefsDataSource"
     const val MAX_LOG_ENTRIES = 30
@@ -427,5 +618,13 @@ class DataStoreSoundPreferencesDataSource(
     val KEY_QUICK_TILE_SLOT1_PROFILE_ID = stringPreferencesKey("quick_tile_slot1_profile_id")
     val KEY_QUICK_TILE_SLOT2_PROFILE_ID = stringPreferencesKey("quick_tile_slot2_profile_id")
     val KEY_SAVED_MEDIA_BEFORE_MUTE = intPreferencesKey("saved_media_before_mute")
+    val KEY_APP_LANGUAGE_CODE = stringPreferencesKey("app_language_code")
+    val KEY_AUTOMATIONS_PAUSED = booleanPreferencesKey("automations_paused")
+    val KEY_HAPTIC_FEEDBACK_ENABLED = booleanPreferencesKey("haptic_feedback_enabled")
+    val KEY_NOTIFY_ON_AUTO_TRANSITION = booleanPreferencesKey("notify_on_auto_transition")
+    val KEY_DEFAULT_TIMER_MINUTES = intPreferencesKey("default_timer_minutes")
+    val KEY_HAS_COMPLETED_ONBOARDING = booleanPreferencesKey("has_completed_onboarding")
+    val KEY_ACCESS_CONTROL_JSON = stringPreferencesKey("access_control_json")
+    val KEY_SYSTEM_ZEN_RULES_ENABLED = booleanPreferencesKey("system_zen_rules_enabled")
   }
 }

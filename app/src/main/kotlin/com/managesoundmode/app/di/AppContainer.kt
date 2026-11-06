@@ -10,8 +10,10 @@ import com.managesoundmode.app.data.repository.SoundModeRepository
 import com.managesoundmode.app.data.system.AndroidSoundSystemController
 import com.managesoundmode.app.data.system.SoundSystemController
 import com.managesoundmode.app.domain.model.SoundProfile
+import com.managesoundmode.app.system.BackgroundGeofenceManager
 import com.managesoundmode.app.system.ExactRuleAlarmScheduler
 import com.managesoundmode.app.system.SmartNotificationManager
+import com.managesoundmode.app.system.SystemZenRuleManager
 import com.managesoundmode.app.tile.SoundModeTileService
 import com.managesoundmode.app.widget.SoundModeGlanceWidget
 import com.managesoundmode.app.work.RestoreSoundModeWorker
@@ -64,7 +66,8 @@ class DefaultAppContainer(
         SoundModeGlanceWidget.refreshAllWidgets(appContext)
         runCatching {
           val prefs = preferencesDataSource.prefsFlow.first()
-          val allProfiles = SoundProfile.defaultPresets + prefs.customProfiles
+          val allProfiles = (SoundProfile.defaultPresets.filterNot { it.id in prefs.deletedProfileIds } +
+            prefs.customProfiles).distinctBy { it.id }
           val activeProfileName = prefs.activeProfileId?.let { activeId ->
             allProfiles.lastOrNull { it.id == activeId }?.name
           }
@@ -76,10 +79,37 @@ class DefaultAppContainer(
             activeProfileName = activeProfileName,
             activeTimer = prefs.activeTimer,
           )
+          SystemZenRuleManager.syncProfilesToSystemZenRules(
+            context = appContext,
+            profiles = allProfiles,
+            activeProfileId = prefs.activeProfileId,
+            enabled = prefs.systemZenRulesEnabled,
+          )
         }
         runCatching {
           SoundModeTileService.refreshAllTiles(appContext)
         }
+      },
+      onSyncSystemZenRules = { profiles, activeProfileId, enabled ->
+        SystemZenRuleManager.syncProfilesToSystemZenRules(
+          context = appContext,
+          profiles = profiles,
+          activeProfileId = activeProfileId,
+          enabled = enabled,
+        )
+      },
+      onSyncGeofenceRegistrations = { locationRules, automationsPaused ->
+        BackgroundGeofenceManager.syncGeofenceRegistrations(
+          context = appContext,
+          locationRules = locationRules,
+          automationsPaused = automationsPaused,
+        )
+      },
+      onScheduleGeofenceDwellCheck = { delayMillis ->
+        BackgroundGeofenceManager.scheduleDwellVerificationAlarm(
+          context = appContext,
+          delayMillis = delayMillis,
+        )
       },
     )
   }

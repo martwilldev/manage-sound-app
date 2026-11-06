@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PriorityHigh
@@ -75,6 +76,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.managesoundmode.app.domain.model.ScheduleRule
 import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.domain.model.Weekday
+import com.managesoundmode.app.ui.common.AppLabels
+import com.managesoundmode.app.ui.common.AppTestTags
 import com.managesoundmode.app.ui.components.M3CheckSwitch
 import com.managesoundmode.app.ui.components.groupedCardShape
 import com.managesoundmode.app.ui.components.profileIconForKey
@@ -90,19 +93,20 @@ internal fun SchedulesTabContent(
   onToggleRule: (ScheduleRule, Boolean) -> Unit,
   onEditRule: (ScheduleRule) -> Unit,
   onDeleteRule: (String) -> Unit = {},
+  onDuplicateRule: (ScheduleRule) -> Unit = {},
   onRequestExactAlarmPermission: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   LazyColumn(
     modifier = modifier
       .fillMaxSize()
-      .testTag("schedules_tab_list"),
+      .testTag(AppTestTags.Schedules.LIST),
     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
     verticalArrangement = Arrangement.spacedBy(3.dp),
   ) {
     item {
       Text(
-        text = "Toque para editar • Pressione e segure para opções ou excluir",
+        text = AppLabels.Schedules.listHint,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
@@ -116,7 +120,8 @@ internal fun SchedulesTabContent(
         Card(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(bottom = 12.dp)
+            .testTag(AppTestTags.Schedules.EXACT_ALARM_BANNER),
           shape = RoundedCornerShape(24.dp),
           colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -140,13 +145,16 @@ internal fun SchedulesTabContent(
                 tint = MaterialTheme.colorScheme.onErrorContainer,
               )
               Text(
-                text = "Autorize alarmes exatos para pontualidade",
+                text = AppLabels.Schedules.exactAlarmBannerTitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
               )
             }
-            TextButton(onClick = onRequestExactAlarmPermission) {
-              Text("Autorizar")
+            TextButton(
+              onClick = onRequestExactAlarmPermission,
+              modifier = Modifier.testTag(AppTestTags.Schedules.AUTHORIZE_EXACT_ALARM_BUTTON),
+            ) {
+              Text(AppLabels.Common.authorize)
             }
           }
         }
@@ -166,6 +174,7 @@ internal fun SchedulesTabContent(
         shape = groupedCardShape(index = index, totalCount = scheduleRules.size),
         onClick = { onEditRule(rule) },
         onToggleEnabled = { enabled -> onToggleRule(rule, enabled) },
+        onDuplicate = { onDuplicateRule(rule) },
         onDelete = { onDeleteRule(rule.id) },
       )
     }
@@ -180,6 +189,7 @@ private fun GoogleClockScheduleCard(
   shape: RoundedCornerShape,
   onClick: () -> Unit,
   onToggleEnabled: (Boolean) -> Unit,
+  onDuplicate: () -> Unit,
   onDelete: () -> Unit,
 ) {
   val haptics = LocalHapticFeedback.current
@@ -202,7 +212,7 @@ private fun GoogleClockScheduleCard(
           showContextMenu = true
         },
       )
-      .testTag("schedule_card_${rule.id}"),
+      .testTag(AppTestTags.Schedules.card(rule.id)),
     shape = shape,
     colors = CardDefaults.cardColors(containerColor = containerColor),
   ) {
@@ -250,11 +260,13 @@ private fun GoogleClockScheduleCard(
         Box {
           IconButton(
             onClick = { showContextMenu = true },
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier
+              .size(34.dp)
+              .testTag(AppTestTags.Schedules.optionsButton(rule.id)),
           ) {
             Icon(
               imageVector = Icons.Default.MoreVert,
-              contentDescription = "Opções do horário ${rule.name}",
+              contentDescription = AppLabels.Schedules.optionsContentDescription(rule.name),
               tint = MaterialTheme.colorScheme.onSurfaceVariant,
               modifier = Modifier.size(18.dp),
             )
@@ -265,7 +277,7 @@ private fun GoogleClockScheduleCard(
             onDismissRequest = { showContextMenu = false },
           ) {
             DropdownMenuItem(
-              text = { Text("Editar horário") },
+              text = { Text(AppLabels.Schedules.editScheduleMenu) },
               leadingIcon = {
                 Icon(
                   imageVector = Icons.Outlined.Edit,
@@ -276,9 +288,32 @@ private fun GoogleClockScheduleCard(
                 showContextMenu = false
                 onClick()
               },
+              modifier = Modifier.testTag(AppTestTags.Schedules.menuEditItem(rule.id)),
             )
             DropdownMenuItem(
-              text = { Text(if (rule.enabled) "Desativar horário" else "Ativar horário") },
+              text = { Text(AppLabels.Schedules.duplicateScheduleMenu) },
+              leadingIcon = {
+                Icon(
+                  imageVector = Icons.Default.ContentCopy,
+                  contentDescription = null,
+                )
+              },
+              onClick = {
+                showContextMenu = false
+                onDuplicate()
+              },
+              modifier = Modifier.testTag(AppTestTags.Schedules.menuDuplicateItem(rule.id)),
+            )
+            DropdownMenuItem(
+              text = {
+                Text(
+                  if (rule.enabled) {
+                    AppLabels.Schedules.disableScheduleMenu
+                  } else {
+                    AppLabels.Schedules.enableScheduleMenu
+                  },
+                )
+              },
               leadingIcon = {
                 Icon(
                   imageVector = Icons.Default.Check,
@@ -289,12 +324,13 @@ private fun GoogleClockScheduleCard(
                 showContextMenu = false
                 onToggleEnabled(!rule.enabled)
               },
+              modifier = Modifier.testTag(AppTestTags.Schedules.menuToggleItem(rule.id)),
             )
             HorizontalDivider()
             DropdownMenuItem(
               text = {
                 Text(
-                  text = "Excluir horário",
+                  text = AppLabels.Schedules.deleteScheduleMenu,
                   color = MaterialTheme.colorScheme.error,
                 )
               },
@@ -309,6 +345,7 @@ private fun GoogleClockScheduleCard(
                 showContextMenu = false
                 onDelete()
               },
+              modifier = Modifier.testTag(AppTestTags.Schedules.menuDeleteItem(rule.id)),
             )
           }
         }
@@ -339,7 +376,7 @@ private fun GoogleClockScheduleCard(
         M3CheckSwitch(
           checked = rule.enabled,
           onCheckedChange = onToggleEnabled,
-          modifier = Modifier.testTag("schedule_switch_${rule.id}"),
+          modifier = Modifier.testTag(AppTestTags.Schedules.switch(rule.id)),
         )
       }
 
@@ -389,7 +426,7 @@ private fun GoogleClockScheduleCard(
                 modifier = Modifier.size(12.dp),
               )
               Text(
-                text = "Prioritário",
+                text = AppLabels.Schedules.highPriorityBadge,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 softWrap = false,
@@ -447,7 +484,9 @@ internal fun ScheduleEditorBottomSheet(
   var activeTimePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
 
   fun buildRule(): ScheduleRule {
-    val resolvedName = name.trim().ifEmpty { initialRule?.name ?: "Rotina Agendada" }
+    val resolvedName = name.trim().ifEmpty {
+      initialRule?.name ?: AppLabels.Schedules.defaultScheduleName
+    }
     return ScheduleRule(
       id = initialRule?.id ?: "sched_${System.currentTimeMillis()}",
       name = resolvedName,
@@ -478,7 +517,13 @@ internal fun ScheduleEditorBottomSheet(
     AlertDialog(
       onDismissRequest = { activeTimePickerTarget = null },
       title = {
-        Text(if (isStart) "Horário de Início" else "Horário de Término")
+        Text(
+          if (isStart) {
+            AppLabels.Schedules.selectStartTimeTitle
+          } else {
+            AppLabels.Schedules.selectEndTimeTitle
+          },
+        )
       },
       text = {
         Box(
@@ -502,12 +547,12 @@ internal fun ScheduleEditorBottomSheet(
             notifyAutoSaveIfEditing()
           },
         ) {
-          Text("OK")
+          Text(AppLabels.Common.ok)
         }
       },
       dismissButton = {
         TextButton(onClick = { activeTimePickerTarget = null }) {
-          Text("Cancelar")
+          Text(AppLabels.Common.cancel)
         }
       },
     )
@@ -538,14 +583,18 @@ internal fun ScheduleEditorBottomSheet(
             ) {
               Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Voltar",
+                contentDescription = AppLabels.Common.back,
               )
             }
           },
           title = {
             Column {
               Text(
-                text = if (isEditing) "Editar Horário" else "Novo Horário",
+                text = if (isEditing) {
+                  AppLabels.Schedules.editScheduleTitle
+                } else {
+                  AppLabels.Schedules.newScheduleTitle
+                },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -553,7 +602,7 @@ internal fun ScheduleEditorBottomSheet(
               )
               if (isEditing) {
                 Text(
-                  text = "Salvo automaticamente",
+                  text = AppLabels.Common.autoSavedSubtitle,
                   style = MaterialTheme.typography.labelSmall,
                   color = MaterialTheme.colorScheme.primary,
                 )
@@ -564,20 +613,20 @@ internal fun ScheduleEditorBottomSheet(
             if (isEditing && onDelete != null) {
               IconButton(
                 onClick = { onDelete(initialRule.id) },
-                modifier = Modifier.testTag("delete_schedule_top_button"),
+                modifier = Modifier.testTag(AppTestTags.Schedules.DELETE_TOP_BUTTON),
               ) {
                 Icon(
                   imageVector = Icons.Default.DeleteOutline,
-                  contentDescription = "Excluir horário",
+                  contentDescription = AppLabels.Schedules.deleteScheduleMenu,
                   tint = MaterialTheme.colorScheme.error,
                 )
               }
             } else if (!isEditing) {
               TextButton(
                 onClick = { onConfirm(buildRule()) },
-                modifier = Modifier.testTag("confirm_save_schedule_button"),
+                modifier = Modifier.testTag(AppTestTags.Schedules.CONFIRM_SAVE_BUTTON),
               ) {
-                Text("Criar", fontWeight = FontWeight.Bold)
+                Text(AppLabels.Common.create, fontWeight = FontWeight.Bold)
               }
             }
           },
@@ -601,13 +650,13 @@ internal fun ScheduleEditorBottomSheet(
           horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
           TimeBoxCard(
-            label = "INÍCIO",
+            label = AppLabels.Schedules.startTimeLabel,
             timeText = String.format(Locale.ROOT, "%02d:%02d", startHour, startMinute),
             onClick = { activeTimePickerTarget = "start" },
             modifier = Modifier.weight(1f),
           )
           TimeBoxCard(
-            label = "FIM",
+            label = AppLabels.Schedules.endTimeLabel,
             timeText = String.format(Locale.ROOT, "%02d:%02d", endHour, endMinute),
             onClick = { activeTimePickerTarget = "end" },
             modifier = Modifier.weight(1f),
@@ -620,17 +669,17 @@ internal fun ScheduleEditorBottomSheet(
             name = it
             notifyAutoSaveIfEditing()
           },
-          label = { Text("Nome da rotina (ex.: Dormir, Trabalho)") },
+          label = { Text(AppLabels.Schedules.scheduleNameLabel) },
           singleLine = true,
           shape = RoundedCornerShape(16.dp),
           modifier = Modifier
             .fillMaxWidth()
-            .testTag("schedule_name_input"),
+            .testTag(AppTestTags.Schedules.NAME_INPUT),
         )
 
         // Dias da semana (7 círculos responsivos estilo Google Clock)
         Text(
-          text = "Repetir nos dias",
+          text = AppLabels.Schedules.daysOfWeekSectionTitle,
           style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -681,7 +730,7 @@ internal fun ScheduleEditorBottomSheet(
 
         // Seleção exclusiva de Perfil (sem edição de perfil embutida)
         Text(
-          text = "Perfil de som aplicado",
+          text = AppLabels.Schedules.targetProfileSectionTitle,
           style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -723,12 +772,12 @@ internal fun ScheduleEditorBottomSheet(
               .padding(end = 12.dp),
           ) {
             Text(
-              text = "Alta Prioridade (Sobrepor outros)",
+              text = AppLabels.Schedules.highPriorityTitle,
               style = MaterialTheme.typography.bodyMedium,
               fontWeight = FontWeight.Medium,
             )
             Text(
-              text = "Vence conflitos mesmo quando configurado para Som Alto",
+              text = AppLabels.Schedules.highPrioritySubtitle,
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -749,7 +798,7 @@ internal fun ScheduleEditorBottomSheet(
               .fillMaxWidth()
               .height(52.dp),
           ) {
-            Text("Criar Horário")
+            Text(AppLabels.Schedules.createScheduleButton)
           }
         }
       }

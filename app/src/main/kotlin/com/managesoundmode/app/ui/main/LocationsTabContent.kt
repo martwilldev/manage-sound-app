@@ -82,8 +82,11 @@ import com.managesoundmode.app.domain.model.LocationRule
 import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.system.AddressSearchResult
 import com.managesoundmode.app.system.LocationProximityHelper
+import com.managesoundmode.app.ui.common.AppLabels
+import com.managesoundmode.app.ui.common.AppTestTags
 import com.managesoundmode.app.ui.components.GeofenceMapPickerCard
 import com.managesoundmode.app.ui.components.M3CheckSwitch
+import com.managesoundmode.app.ui.components.ProminentLocationDisclosureDialog
 import com.managesoundmode.app.ui.components.groupedCardShape
 import com.managesoundmode.app.ui.components.profileIconForKey
 import com.managesoundmode.app.ui.theme.onTonalContainerColor
@@ -102,11 +105,15 @@ internal fun LocationsTabContent(
   onDeleteRule: (String) -> Unit = {},
   onSyncGpsCoordinates: (Double, Double) -> Unit = { _, _ -> },
   onShowStatusMessage: (String) -> Unit = {},
+  hasAcceptedLocationDisclosure: Boolean = true,
+  onAcceptLocationDisclosure: () -> Unit = {},
+  onSyncBackgroundGeofencesNow: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   var isSyncingGps by remember { mutableStateOf(false) }
+  var showGpsDisclosureModal by rememberSaveable { mutableStateOf(false) }
 
   fun triggerGpsSync() {
     if (isSyncingGps) return
@@ -117,7 +124,7 @@ internal fun LocationsTabContent(
       if (coords != null) {
         onSyncGpsCoordinates(coords.latitude, coords.longitude)
       } else {
-        onShowStatusMessage("Não foi possível ler o GPS agora. Verifique se a localização do aparelho está ativa.")
+        onShowStatusMessage(AppLabels.Locations.gpsReadErrorMessage)
       }
     }
   }
@@ -130,14 +137,30 @@ internal fun LocationsTabContent(
     if (granted) {
       triggerGpsSync()
     } else {
-      onShowStatusMessage("Permissão de localização necessária para verificar cercas pelo GPS.")
+      onShowStatusMessage(AppLabels.Locations.gpsPermissionRequiredMessage)
     }
+  }
+
+  if (showGpsDisclosureModal) {
+    ProminentLocationDisclosureDialog(
+      onAcceptAndContinue = {
+        showGpsDisclosureModal = false
+        onAcceptLocationDisclosure()
+        locationPermissionLauncher.launch(
+          arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+          ),
+        )
+      },
+      onDismiss = { showGpsDisclosureModal = false },
+    )
   }
 
   LazyColumn(
     modifier = modifier
       .fillMaxSize()
-      .testTag("locations_tab_list"),
+      .testTag(AppTestTags.Locations.LIST),
     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
     verticalArrangement = Arrangement.spacedBy(3.dp),
   ) {
@@ -147,7 +170,7 @@ internal fun LocationsTabContent(
         modifier = Modifier
           .fillMaxWidth()
           .padding(bottom = 8.dp)
-          .testTag("sync_gps_locations_card"),
+          .testTag(AppTestTags.Locations.SYNC_GPS_CARD),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(
           containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -162,12 +185,12 @@ internal fun LocationsTabContent(
         ) {
           Column(modifier = Modifier.weight(1f)) {
             Text(
-              text = "Cercas Geográficas (OpenStreetMap)",
+              text = AppLabels.Locations.geofenceHeaderTitle,
               style = MaterialTheme.typography.titleSmall,
               fontWeight = FontWeight.SemiBold,
             )
             Text(
-              text = "Toque em um local para ajustar o pino e o raio no mapa ou pressione e segure para excluir.",
+              text = AppLabels.Locations.geofenceHeaderSubtitle,
               style = MaterialTheme.typography.bodySmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -177,6 +200,8 @@ internal fun LocationsTabContent(
             onClick = {
               if (LocationProximityHelper.hasLocationPermission(context)) {
                 triggerGpsSync()
+              } else if (!hasAcceptedLocationDisclosure) {
+                showGpsDisclosureModal = true
               } else {
                 locationPermissionLauncher.launch(
                   arrayOf(
@@ -189,7 +214,7 @@ internal fun LocationsTabContent(
             enabled = !isSyncingGps,
             shape = RoundedCornerShape(14.dp),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            modifier = Modifier.testTag("verify_gps_proximity_button"),
+            modifier = Modifier.testTag(AppTestTags.Locations.VERIFY_GPS_BUTTON),
           ) {
             if (isSyncingGps) {
               CircularProgressIndicator(
@@ -205,7 +230,67 @@ internal fun LocationsTabContent(
             }
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-              text = if (isSyncingGps) "Lendo GPS..." else "Verificar pelo GPS",
+              text = if (isSyncingGps) {
+                AppLabels.Locations.readingGpsButton
+              } else {
+                AppLabels.Locations.verifyGpsButton
+              },
+              style = MaterialTheme.typography.labelLarge,
+              maxLines = 1,
+              softWrap = false,
+            )
+          }
+        }
+      }
+    }
+
+    // [GEO-01] Card de status do Geofencing Passivo em Background (Dwell 2 min + Wi-Fi SSID)
+    item {
+      val activeGeofenceCount = locationRules.count { it.enabled }
+      Card(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(bottom = 8.dp)
+          .testTag(AppTestTags.Locations.GEOFENCE_STATUS_CARD),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+      ) {
+        FlowRow(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          Column(modifier = Modifier.weight(1f)) {
+            Text(
+              text = AppLabels.Locations.geofenceStatusTitle,
+              style = MaterialTheme.typography.titleSmall,
+              fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+              text = AppLabels.Locations.geofenceStatusSubtitle(activeGeofenceCount),
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+
+          FilledTonalButton(
+            onClick = onSyncBackgroundGeofencesNow,
+            shape = RoundedCornerShape(14.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.testTag(AppTestTags.Locations.SYNC_GEOFENCES_BUTTON),
+          ) {
+            Icon(
+              imageVector = Icons.Default.LocationOn,
+              contentDescription = null,
+              modifier = Modifier.size(16.dp),
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = AppLabels.Locations.syncGeofencesButton,
               style = MaterialTheme.typography.labelLarge,
               maxLines = 1,
               softWrap = false,
@@ -266,7 +351,7 @@ private fun LocationRuleCard(
           showContextMenu = true
         },
       )
-      .testTag("location_card_${rule.id}"),
+      .testTag(AppTestTags.Locations.card(rule.id)),
     shape = shape,
     colors = CardDefaults.cardColors(containerColor = containerColor),
   ) {
@@ -333,7 +418,7 @@ private fun LocationRuleCard(
               verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
               Text(
-                text = "Raio ${rule.radiusMeters}m",
+                text = AppLabels.Locations.radiusLabel(rule.radiusMeters),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -382,17 +467,19 @@ private fun LocationRuleCard(
           M3CheckSwitch(
             checked = rule.enabled,
             onCheckedChange = onToggleEnabled,
-            modifier = Modifier.testTag("location_switch_${rule.id}"),
+            modifier = Modifier.testTag(AppTestTags.Locations.switch(rule.id)),
           )
 
           Box {
             IconButton(
               onClick = { showContextMenu = true },
-              modifier = Modifier.size(34.dp),
+              modifier = Modifier
+                .size(34.dp)
+                .testTag(AppTestTags.Locations.optionsButton(rule.id)),
             ) {
               Icon(
                 imageVector = Icons.Default.MoreVert,
-                contentDescription = "Opções do local ${rule.name}",
+                contentDescription = AppLabels.Locations.optionsContentDescription(rule.name),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
               )
@@ -403,7 +490,7 @@ private fun LocationRuleCard(
               onDismissRequest = { showContextMenu = false },
             ) {
               DropdownMenuItem(
-                text = { Text("Editar local e mapa") },
+                text = { Text(AppLabels.Locations.editLocationMenu) },
                 leadingIcon = {
                   Icon(
                     imageVector = Icons.Outlined.Edit,
@@ -414,14 +501,15 @@ private fun LocationRuleCard(
                   showContextMenu = false
                   onClick()
                 },
+                modifier = Modifier.testTag(AppTestTags.Locations.menuEditItem(rule.id)),
               )
               DropdownMenuItem(
                 text = {
                   Text(
                     if (rule.isCurrentlyInside) {
-                      "Marcar como fora deste local"
+                      AppLabels.Locations.markOutsideMenu
                     } else {
-                      "Simular presença neste local"
+                      AppLabels.Locations.simulateInsideMenu
                     },
                   )
                 },
@@ -435,9 +523,18 @@ private fun LocationRuleCard(
                   showContextMenu = false
                   onTogglePresence()
                 },
+                modifier = Modifier.testTag(AppTestTags.Locations.menuPresenceItem(rule.id)),
               )
               DropdownMenuItem(
-                text = { Text(if (rule.enabled) "Desativar local" else "Ativar local") },
+                text = {
+                  Text(
+                    if (rule.enabled) {
+                      AppLabels.Locations.disableLocationMenu
+                    } else {
+                      AppLabels.Locations.enableLocationMenu
+                    },
+                  )
+                },
                 leadingIcon = {
                   Icon(
                     imageVector = Icons.Default.Check,
@@ -448,12 +545,13 @@ private fun LocationRuleCard(
                   showContextMenu = false
                   onToggleEnabled(!rule.enabled)
                 },
+                modifier = Modifier.testTag(AppTestTags.Locations.menuToggleItem(rule.id)),
               )
               HorizontalDivider()
               DropdownMenuItem(
                 text = {
                   Text(
-                    text = "Excluir local",
+                    text = AppLabels.Locations.deleteLocationMenu,
                     color = MaterialTheme.colorScheme.error,
                   )
                 },
@@ -468,6 +566,7 @@ private fun LocationRuleCard(
                   showContextMenu = false
                   onDelete()
                 },
+                modifier = Modifier.testTag(AppTestTags.Locations.menuDeleteItem(rule.id)),
               )
             }
           }
@@ -486,7 +585,7 @@ private fun LocationRuleCard(
             color = MaterialTheme.colorScheme.primary,
           ) {
             Text(
-              text = "No local",
+              text = AppLabels.Locations.insideBadge,
               style = MaterialTheme.typography.labelMedium,
               fontWeight = FontWeight.Bold,
               maxLines = 1,
@@ -575,7 +674,9 @@ internal fun LocationEditorBottomSheet(
   var searchResults by remember { mutableStateOf<List<AddressSearchResult>>(emptyList()) }
 
   fun buildRule(): LocationRule {
-    val resolvedName = name.trim().ifEmpty { initialRule?.name ?: "Local Personalizado" }
+    val resolvedName = name.trim().ifEmpty {
+      initialRule?.name ?: AppLabels.Locations.defaultLocationName
+    }
     return LocationRule(
       id = initialRule?.id ?: "loc_${System.currentTimeMillis()}",
       name = resolvedName,
@@ -644,14 +745,18 @@ internal fun LocationEditorBottomSheet(
             ) {
               Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Voltar",
+                contentDescription = AppLabels.Common.back,
               )
             }
           },
           title = {
             Column {
               Text(
-                text = if (isEditing) "Editar Local" else "Novo Local",
+                text = if (isEditing) {
+                  AppLabels.Locations.editLocationTitle
+                } else {
+                  AppLabels.Locations.newLocationTitle
+                },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -659,7 +764,7 @@ internal fun LocationEditorBottomSheet(
               )
               if (isEditing) {
                 Text(
-                  text = "Salvo automaticamente",
+                  text = AppLabels.Common.autoSavedSubtitle,
                   style = MaterialTheme.typography.labelSmall,
                   color = MaterialTheme.colorScheme.primary,
                 )
@@ -670,20 +775,20 @@ internal fun LocationEditorBottomSheet(
             if (isEditing && onDelete != null) {
               IconButton(
                 onClick = { onDelete(initialRule.id) },
-                modifier = Modifier.testTag("delete_location_top_button"),
+                modifier = Modifier.testTag(AppTestTags.Locations.DELETE_TOP_BUTTON),
               ) {
                 Icon(
                   imageVector = Icons.Default.DeleteOutline,
-                  contentDescription = "Excluir local",
+                  contentDescription = AppLabels.Locations.deleteLocationMenu,
                   tint = MaterialTheme.colorScheme.error,
                 )
               }
             } else if (!isEditing) {
               TextButton(
                 onClick = { onConfirm(buildRule()) },
-                modifier = Modifier.testTag("confirm_save_location_button"),
+                modifier = Modifier.testTag(AppTestTags.Locations.CONFIRM_SAVE_BUTTON),
               ) {
-                Text("Criar", fontWeight = FontWeight.Bold)
+                Text(AppLabels.Common.create, fontWeight = FontWeight.Bold)
               }
             }
           },
@@ -707,12 +812,12 @@ internal fun LocationEditorBottomSheet(
             name = it
             notifyAutoSaveIfEditing()
           },
-          label = { Text("Nome do local (ex.: Escritório, Faculdade)") },
+          label = { Text(AppLabels.Locations.locationNameLabel) },
           singleLine = true,
           shape = RoundedCornerShape(16.dp),
           modifier = Modifier
             .fillMaxWidth()
-            .testTag("location_name_input"),
+            .testTag(AppTestTags.Locations.NAME_INPUT),
         )
 
         // Mapa Interativo OpenStreetMap + Busca de Endereço + Botão GPS Atual
@@ -768,12 +873,12 @@ internal fun LocationEditorBottomSheet(
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Text(
-              text = "Raio da Cerca Geográfica",
+              text = AppLabels.Locations.radiusSectionTitle,
               style = MaterialTheme.typography.titleSmall,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-              text = "${radius.roundToInt()} metros",
+              text = AppLabels.Locations.metersValue(radius.roundToInt()),
               style = MaterialTheme.typography.labelLarge,
               fontWeight = FontWeight.Bold,
               color = MaterialTheme.colorScheme.primary,
@@ -784,7 +889,7 @@ internal fun LocationEditorBottomSheet(
             onValueChange = { radius = it },
             onValueChangeFinished = { notifyAutoSaveIfEditing() },
             valueRange = 100f..1000f,
-            modifier = Modifier.testTag("geofence_radius_slider"),
+            modifier = Modifier.testTag(AppTestTags.Locations.RADIUS_SLIDER),
           )
           FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -815,14 +920,14 @@ internal fun LocationEditorBottomSheet(
             wifiSsid = it
             notifyAutoSaveIfEditing()
           },
-          label = { Text("Rede Wi-Fi opcional (confirmação indoor)") },
+          label = { Text(AppLabels.Locations.wifiSsidLabel) },
           singleLine = true,
           shape = RoundedCornerShape(16.dp),
           modifier = Modifier.fillMaxWidth(),
         )
 
         Text(
-          text = "Perfil ao permanecer no local",
+          text = AppLabels.Locations.targetProfileSectionTitle,
           style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -858,7 +963,7 @@ internal fun LocationEditorBottomSheet(
             },
             modifier = Modifier
               .fillMaxWidth()
-              .testTag("toggle_location_presence_${initialRule.id}"),
+              .testTag(AppTestTags.Locations.togglePresenceButton(initialRule.id)),
           ) {
             Icon(
               imageVector = Icons.Default.MyLocation,
@@ -868,9 +973,9 @@ internal fun LocationEditorBottomSheet(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
               if (initialRule.isCurrentlyInside) {
-                "Marcar como fora deste local"
+                AppLabels.Locations.markOutsideMenu
               } else {
-                "Testar presença neste local agora"
+                AppLabels.Locations.testPresenceButton
               },
             )
           }
@@ -883,7 +988,7 @@ internal fun LocationEditorBottomSheet(
               .fillMaxWidth()
               .height(52.dp),
           ) {
-            Text("Criar Local")
+            Text(AppLabels.Locations.createLocationButton)
           }
         }
       }

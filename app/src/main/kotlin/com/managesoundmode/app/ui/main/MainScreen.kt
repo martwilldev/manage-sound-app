@@ -34,19 +34,26 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PauseCircleFilled
+import androidx.compose.material.icons.filled.PlayCircleFilled
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.RingVolume
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WarningAmber
@@ -54,6 +61,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
@@ -91,9 +100,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.managesoundmode.app.domain.model.AppAccessRole
+import com.managesoundmode.app.domain.model.AppPermission
 import com.managesoundmode.app.domain.model.LocationRule
 import com.managesoundmode.app.domain.model.RestorePolicy
 import com.managesoundmode.app.domain.model.ScheduleRule
@@ -106,6 +119,10 @@ import com.managesoundmode.app.domain.model.VolumeStreams
 import com.managesoundmode.app.system.SmartNotificationManager
 import com.managesoundmode.app.tile.QuickTileKind
 import com.managesoundmode.app.tile.SoundModeTileService
+import com.managesoundmode.app.ui.common.AppLabels
+import com.managesoundmode.app.ui.common.AppLanguage
+import com.managesoundmode.app.ui.common.AppTestTags
+import com.managesoundmode.app.ui.components.FirstRunOnboardingDialog
 import com.managesoundmode.app.ui.components.PillVolumeSliderRow
 import com.managesoundmode.app.ui.components.ProfileEditorBottomSheet
 import com.managesoundmode.app.ui.components.ProminentLocationDisclosureDialog
@@ -117,41 +134,42 @@ import com.managesoundmode.app.ui.theme.tonalContainerColor
 import com.managesoundmode.app.widget.SoundModeGlanceWidget
 
 enum class MainAppTab(
-  val label: String,
-  val topBarTitle: String,
   val icon: ImageVector,
   val tag: String,
 ) {
   NOW(
-    label = "Agora",
-    topBarTitle = "Modos de Som",
     icon = Icons.AutoMirrored.Filled.VolumeUp,
-    tag = "tab_now",
+    tag = AppTestTags.Tabs.NOW,
   ),
   PROFILES(
-    label = "Perfis",
-    topBarTitle = "Perfis",
     icon = Icons.Default.Style,
-    tag = "tab_profiles",
+    tag = AppTestTags.Tabs.PROFILES,
   ),
   SCHEDULES(
-    label = "Horários",
-    topBarTitle = "Horários",
     icon = Icons.Default.Schedule,
-    tag = "tab_schedules",
+    tag = AppTestTags.Tabs.SCHEDULES,
   ),
   LOCATIONS(
-    label = "Locais",
-    topBarTitle = "Locais",
     icon = Icons.Default.LocationOn,
-    tag = "tab_locations",
+    tag = AppTestTags.Tabs.LOCATIONS,
   ),
-  SETTINGS(
-    label = "Ajustes",
-    topBarTitle = "Ajustes",
-    icon = Icons.Default.Tune,
-    tag = "tab_settings",
-  ),
+  ;
+
+  val label: String
+    get() = when (this) {
+      NOW -> AppLabels.Tabs.nowLabel
+      PROFILES -> AppLabels.Tabs.profilesLabel
+      SCHEDULES -> AppLabels.Tabs.schedulesLabel
+      LOCATIONS -> AppLabels.Tabs.locationsLabel
+    }
+
+  val topBarTitle: String
+    get() = when (this) {
+      NOW -> AppLabels.Tabs.nowTopBarTitle
+      PROFILES -> AppLabels.Tabs.profilesTopBarTitle
+      SCHEDULES -> AppLabels.Tabs.schedulesTopBarTitle
+      LOCATIONS -> AppLabels.Tabs.locationsTopBarTitle
+    }
 }
 
 @Composable
@@ -164,6 +182,12 @@ fun MainScreen(
 
   val notificationPermissionLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.RequestPermission(),
+  ) { _ ->
+    viewModel.onRefreshSystemState()
+  }
+
+  val locationPermissionLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.RequestMultiplePermissions(),
   ) { _ ->
     viewModel.onRefreshSystemState()
   }
@@ -312,6 +336,41 @@ fun MainScreen(
             }
           },
           onClearLogs = viewModel::onClearTransitionLogs,
+          onSetAppLanguage = viewModel::onSetAppLanguage,
+          onSetAutomationsPaused = viewModel::onSetAutomationsPaused,
+          onSetHapticFeedbackEnabled = viewModel::onSetHapticFeedbackEnabled,
+          onSetNotifyOnAutoTransition = viewModel::onSetNotifyOnAutoTransition,
+          onSetDefaultTimerMinutes = viewModel::onSetDefaultTimerMinutes,
+          onResetFactoryDefaults = viewModel::onResetFactoryDefaults,
+          onDuplicateProfile = viewModel::onDuplicateProfile,
+          onDuplicateScheduleRule = viewModel::onDuplicateScheduleRule,
+          onExportBackupJson = viewModel::onExportBackupJson,
+          onImportBackupJson = viewModel::onImportBackupJson,
+          onRequestLocationPermission = {
+            if (!state.hasLocationPermission) {
+              locationPermissionLauncher.launch(
+                arrayOf(
+                  Manifest.permission.ACCESS_FINE_LOCATION,
+                  Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+              )
+            } else {
+              val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+              }
+              runCatching { context.startActivity(intent) }
+            }
+          },
+          onCompleteOnboarding = viewModel::onCompleteOnboarding,
+          onReopenOnboarding = viewModel::onReopenOnboarding,
+          onSetAccessRole = viewModel::onSetAccessRole,
+          onToggleAccessPermission = viewModel::onToggleAccessPermission,
+          onSetAccessPin = viewModel::onSetAccessPin,
+          onUnlockAdminWithPin = viewModel::onUnlockAdminWithPin,
+          onSetSystemZenRulesEnabled = viewModel::onSetSystemZenRulesEnabled,
+          onSyncSystemZenRulesNow = viewModel::onSyncSystemZenRulesNow,
+          onSyncBackgroundGeofencesNow = viewModel::onSyncBackgroundGeofencesNow,
           modifier = modifier,
         )
       }
@@ -371,10 +430,44 @@ internal fun MainDashboardContent(
   onTestSmartNotification: () -> Unit = {},
   onPinHomeWidget: () -> Unit = {},
   onClearLogs: () -> Unit = {},
+  onSetAppLanguage: (AppLanguage) -> Unit = { AppLabels.currentLanguage = it },
+  onSetAutomationsPaused: (Boolean) -> Unit = {},
+  onSetHapticFeedbackEnabled: (Boolean) -> Unit = {},
+  onSetNotifyOnAutoTransition: (Boolean) -> Unit = {},
+  onSetDefaultTimerMinutes: (Int) -> Unit = {},
+  onResetFactoryDefaults: () -> Unit = {},
+  onDuplicateProfile: (SoundProfile) -> Unit = {},
+  onDuplicateScheduleRule: (ScheduleRule) -> Unit = {},
+  onExportBackupJson: ((String) -> Unit) -> Unit = {},
+  onImportBackupJson: (String) -> Unit = {},
+  onRequestLocationPermission: () -> Unit = {},
+  onCompleteOnboarding: () -> Unit = {},
+  onReopenOnboarding: () -> Unit = {},
+  onSetAccessRole: (AppAccessRole) -> Unit = {},
+  onToggleAccessPermission: (AppPermission, Boolean) -> Unit = { _, _ -> },
+  onSetAccessPin: (String?) -> Unit = {},
+  onUnlockAdminWithPin: (String, () -> Unit) -> Unit = { _, onSuccess -> onSuccess() },
+  onSetSystemZenRulesEnabled: (Boolean) -> Unit = {},
+  onSyncSystemZenRulesNow: () -> Unit = {},
+  onSyncBackgroundGeofencesNow: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val snackbarHostState = remember { SnackbarHostState() }
   var selectedTab by rememberSaveable { mutableStateOf(MainAppTab.NOW) }
+  var showGlobalOverflowMenu by remember { mutableStateOf(false) }
+  var showSettingsFullScreen by rememberSaveable { mutableStateOf(false) }
+  var globalSettingsDialogCategory by rememberSaveable { mutableStateOf<SettingsCategory?>(null) }
+  var showGlobalResetConfirmDialog by rememberSaveable { mutableStateOf(false) }
+  var showGlobalPinChallengeDialog by rememberSaveable { mutableStateOf(false) }
+  var pendingLocationPermissionAfterDisclosure by rememberSaveable { mutableStateOf(false) }
+
+  val openAccessControlOrChallenge: () -> Unit = {
+    if (state.accessControlConfig.isPinRequired && state.accessControlConfig.activeRole != AppAccessRole.ADMIN) {
+      showGlobalPinChallengeDialog = true
+    } else {
+      globalSettingsDialogCategory = SettingsCategory.ACCESS_CONTROL
+    }
+  }
 
   // Estado unificado para o Editor Full-Screen de Perfil
   var editingProfile by remember { mutableStateOf<SoundProfile?>(null) }
@@ -447,15 +540,49 @@ internal fun MainDashboardContent(
     )
   }
 
+  val handleLocationPermissionRequest: () -> Unit = {
+    if (!state.hasAcceptedLocationDisclosure && !state.hasLocationPermission) {
+      pendingLocationPermissionAfterDisclosure = true
+      showLocationDisclosureDialog = true
+    } else {
+      onRequestLocationPermission()
+    }
+  }
+
+  if (!state.hasCompletedOnboarding) {
+    FirstRunOnboardingDialog(
+      state = state,
+      onCompleteOnboarding = onCompleteOnboarding,
+      onSetAppLanguage = onSetAppLanguage,
+      onSetThemeMode = onSetThemeMode,
+      onRequestDndPermission = onRequestDndPermission,
+      onRequestNotificationPermission = onRequestNotificationPermission,
+      onRequestExactAlarmPermission = onRequestExactAlarmPermission,
+      onRequestLocationPermission = handleLocationPermissionRequest,
+      onSetDefaultDayProfileId = onSetDefaultDayProfileId,
+      onSetMuteMediaOnSilent = onSetMuteMediaOnSilent,
+      onSetSmartVolumeTriggerEnabled = onSetSmartVolumeTriggerEnabled,
+      onSetPersistentQuickBarEnabled = onSetPersistentQuickBarEnabled,
+    )
+  }
+
   if (showLocationDisclosureDialog) {
     ProminentLocationDisclosureDialog(
       onAcceptAndContinue = {
         showLocationDisclosureDialog = false
         onAcceptLocationDisclosure()
-        editingLocationRule = null
-        showLocationBottomSheet = true
+        if (pendingLocationPermissionAfterDisclosure) {
+          pendingLocationPermissionAfterDisclosure = false
+          onRequestLocationPermission()
+        } else {
+          editingLocationRule = null
+          showLocationBottomSheet = true
+        }
       },
-      onDismiss = { showLocationDisclosureDialog = false },
+      onDismiss = {
+        showLocationDisclosureDialog = false
+        pendingLocationPermissionAfterDisclosure = false
+      },
     )
   }
 
@@ -482,6 +609,160 @@ internal fun MainDashboardContent(
     )
   }
 
+  if (showGlobalPinChallengeDialog) {
+    AccessPinChallengeDialog(
+      config = state.accessControlConfig,
+      onDismiss = { showGlobalPinChallengeDialog = false },
+      onVerifyAndOpenSubScreen = {
+        showGlobalPinChallengeDialog = false
+        globalSettingsDialogCategory = SettingsCategory.ACCESS_CONTROL
+      },
+      onUnlockAdminWithPin = { pin ->
+        onUnlockAdminWithPin(pin) {
+          showGlobalPinChallengeDialog = false
+        }
+      },
+      onShowStatusMessage = onShowStatusMessage,
+    )
+  }
+
+  if (showGlobalResetConfirmDialog) {
+    FactoryResetConfirmDialog(
+      onConfirm = {
+        showGlobalResetConfirmDialog = false
+        globalSettingsDialogCategory = null
+        onResetFactoryDefaults()
+      },
+      onDismiss = { showGlobalResetConfirmDialog = false },
+    )
+  }
+
+  if (showSettingsFullScreen) {
+    Dialog(
+      onDismissRequest = { showSettingsFullScreen = false },
+      properties = DialogProperties(
+        usePlatformDefaultWidth = false,
+        dismissOnClickOutside = false,
+        dismissOnBackPress = true,
+      ),
+    ) {
+      Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        topBar = {
+          TopAppBar(
+            navigationIcon = {
+              IconButton(
+                onClick = { showSettingsFullScreen = false },
+                modifier = Modifier.testTag(AppTestTags.Settings.CLOSE_SETTINGS_BUTTON),
+              ) {
+                Icon(
+                  imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                  contentDescription = AppLabels.Common.back,
+                )
+              }
+            },
+            title = {
+              Text(
+                text = AppLabels.Tabs.settingsTopBarTitle,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+              )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+              containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+              titleContentColor = MaterialTheme.colorScheme.onBackground,
+            ),
+          )
+        },
+      ) { settingsPadding ->
+        SettingsAndProfilesTabContent(
+          state = state,
+          onSetRestorePolicy = onSetRestorePolicy,
+          onSetDefaultDayProfileId = onSetDefaultDayProfileId,
+          onSetThemeMode = onSetThemeMode,
+          onSetUseDynamicColor = onSetUseDynamicColor,
+          onSetAppLanguage = onSetAppLanguage,
+          onSetAutomationsPaused = onSetAutomationsPaused,
+          onSetHapticFeedbackEnabled = onSetHapticFeedbackEnabled,
+          onSetNotifyOnAutoTransition = onSetNotifyOnAutoTransition,
+          onSetDefaultTimerMinutes = onSetDefaultTimerMinutes,
+          onSetMuteMediaOnSilent = onSetMuteMediaOnSilent,
+          onSetPreserveMediaOnBluetooth = onSetPreserveMediaOnBluetooth,
+          onSetSmartVolumeTriggerEnabled = onSetSmartVolumeTriggerEnabled,
+          onSetPersistentQuickBarEnabled = onSetPersistentQuickBarEnabled,
+          onRequestAddQuickTile = onRequestAddQuickTile,
+          onSetQuickTileSlotProfileId = onSetQuickTileSlotProfileId,
+          onTestSmartNotification = onTestSmartNotification,
+          onPinHomeWidget = onPinHomeWidget,
+          onRequestDndPermission = onRequestDndPermission,
+          onRequestExactAlarmPermission = onRequestExactAlarmPermission,
+          onRequestNotificationPermission = onRequestNotificationPermission,
+          onClearLogs = onClearLogs,
+          onResetFactoryDefaults = onResetFactoryDefaults,
+          onExportBackupJson = onExportBackupJson,
+          onImportBackupJson = onImportBackupJson,
+          onShowStatusMessage = onShowStatusMessage,
+          onRequestLocationPermission = handleLocationPermissionRequest,
+          onReopenOnboarding = {
+            showSettingsFullScreen = false
+            onReopenOnboarding()
+          },
+          onSetAccessRole = onSetAccessRole,
+          onToggleAccessPermission = onToggleAccessPermission,
+          onSetAccessPin = onSetAccessPin,
+          onUnlockAdminWithPin = onUnlockAdminWithPin,
+          onSetSystemZenRulesEnabled = onSetSystemZenRulesEnabled,
+          onSyncSystemZenRulesNow = onSyncSystemZenRulesNow,
+          modifier = Modifier.padding(settingsPadding),
+        )
+      }
+    }
+  }
+
+  if (globalSettingsDialogCategory != null) {
+    SettingsCategoryFullScreenDialog(
+      category = globalSettingsDialogCategory!!,
+      state = state,
+      onDismiss = { globalSettingsDialogCategory = null },
+      onSetRestorePolicy = onSetRestorePolicy,
+      onSetDefaultDayProfileId = onSetDefaultDayProfileId,
+      onSetThemeMode = onSetThemeMode,
+      onSetUseDynamicColor = onSetUseDynamicColor,
+      onSetAppLanguage = onSetAppLanguage,
+      onSetAutomationsPaused = onSetAutomationsPaused,
+      onSetHapticFeedbackEnabled = onSetHapticFeedbackEnabled,
+      onSetNotifyOnAutoTransition = onSetNotifyOnAutoTransition,
+      onSetDefaultTimerMinutes = onSetDefaultTimerMinutes,
+      onSetMuteMediaOnSilent = onSetMuteMediaOnSilent,
+      onSetPreserveMediaOnBluetooth = onSetPreserveMediaOnBluetooth,
+      onSetSmartVolumeTriggerEnabled = onSetSmartVolumeTriggerEnabled,
+      onTestSmartNotification = onTestSmartNotification,
+      onSetPersistentQuickBarEnabled = onSetPersistentQuickBarEnabled,
+      onRequestAddQuickTile = onRequestAddQuickTile,
+      onSetQuickTileSlotProfileId = onSetQuickTileSlotProfileId,
+      onPinHomeWidget = onPinHomeWidget,
+      onRequestDndPermission = onRequestDndPermission,
+      onRequestExactAlarmPermission = onRequestExactAlarmPermission,
+      onRequestNotificationPermission = onRequestNotificationPermission,
+      onClearLogs = onClearLogs,
+      onRequestFactoryResetConfirm = { showGlobalResetConfirmDialog = true },
+      onExportBackupJson = onExportBackupJson,
+      onImportBackupJson = onImportBackupJson,
+      onShowStatusMessage = onShowStatusMessage,
+      onRequestLocationPermission = handleLocationPermissionRequest,
+      onReopenOnboarding = {
+        globalSettingsDialogCategory = null
+        onReopenOnboarding()
+      },
+      onSetAccessRole = onSetAccessRole,
+      onToggleAccessPermission = onToggleAccessPermission,
+      onSetAccessPin = onSetAccessPin,
+      onSetSystemZenRulesEnabled = onSetSystemZenRulesEnabled,
+      onSyncSystemZenRulesNow = onSyncSystemZenRulesNow,
+    )
+  }
+
   Scaffold(
     modifier = modifier.fillMaxSize(),
     containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -496,19 +777,213 @@ internal fun MainDashboardContent(
           )
         },
         actions = {
-          val isLight = state.themeMode == ThemeMode.LIGHT
-          IconButton(
-            onClick = {
-              val nextTheme = if (isLight) ThemeMode.DARK else ThemeMode.LIGHT
-              onSetThemeMode(nextTheme)
-            },
-            modifier = Modifier.testTag("quick_theme_toggle"),
-          ) {
-            Icon(
-              imageVector = if (isLight) Icons.Default.DarkMode else Icons.Default.LightMode,
-              contentDescription = if (isLight) "Ativar Modo Escuro" else "Ativar Modo Claro",
-              tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+          if (state.accessControlConfig.isRestricted || state.accessControlConfig.isPinRequired) {
+            Surface(
+              shape = RoundedCornerShape(14.dp),
+              color = if (state.accessControlConfig.isRestricted) {
+                MaterialTheme.colorScheme.tertiaryContainer
+              } else {
+                MaterialTheme.colorScheme.secondaryContainer
+              },
+              modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .clickable(onClick = openAccessControlOrChallenge)
+                .testTag(AppTestTags.TopBar.ROLE_BADGE_CHIP),
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Lock,
+                  contentDescription = null,
+                  modifier = Modifier.size(14.dp),
+                )
+                Text(
+                  text = state.accessControlConfig.activeRole.shortBadge,
+                  style = MaterialTheme.typography.labelMedium,
+                  fontWeight = FontWeight.SemiBold,
+                )
+              }
+            }
+          }
+
+          Box {
+            IconButton(
+              onClick = { showGlobalOverflowMenu = true },
+              modifier = Modifier.testTag(AppTestTags.TopBar.OVERFLOW_MENU_BUTTON),
+            ) {
+              Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = AppLabels.TopBar.overflowMenuDescription,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+
+            DropdownMenu(
+              expanded = showGlobalOverflowMenu,
+              onDismissRequest = { showGlobalOverflowMenu = false },
+            ) {
+              DropdownMenuItem(
+                text = {
+                  Text(
+                    text = AppLabels.TopBar.openSettingsMenu,
+                    fontWeight = FontWeight.SemiBold,
+                  )
+                },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  showSettingsFullScreen = true
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_SETTINGS),
+              )
+
+              HorizontalDivider()
+
+              DropdownMenuItem(
+                text = {
+                  Text(
+                    if (state.automationsPaused) {
+                      AppLabels.TopBar.resumeAutomationsMenu
+                    } else {
+                      AppLabels.TopBar.pauseAutomationsMenu
+                    },
+                  )
+                },
+                leadingIcon = {
+                  Icon(
+                    imageVector = if (state.automationsPaused) {
+                      Icons.Default.PlayCircleFilled
+                    } else {
+                      Icons.Default.PauseCircleFilled
+                    },
+                    contentDescription = null,
+                    tint = if (state.automationsPaused) {
+                      MaterialTheme.colorScheme.primary
+                    } else {
+                      MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  onSetAutomationsPaused(!state.automationsPaused)
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_PAUSE_AUTOMATIONS),
+              )
+
+              DropdownMenuItem(
+                text = { Text(AppLabels.TopBar.transitionHistoryMenu) },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = null,
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  globalSettingsDialogCategory = SettingsCategory.HISTORY
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_HISTORY),
+              )
+
+              DropdownMenuItem(
+                text = { Text(AppLabels.TopBar.permissionsDiagnosticMenu) },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = null,
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  globalSettingsDialogCategory = SettingsCategory.PERMISSIONS
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_PERMISSIONS),
+              )
+
+              DropdownMenuItem(
+                text = { Text(AppLabels.TopBar.accessControlMenu) },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  openAccessControlOrChallenge()
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_ACCESS_CONTROL),
+              )
+
+              DropdownMenuItem(
+                text = { Text(AppLabels.TopBar.setupWizardMenu) },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = null,
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  onReopenOnboarding()
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_SETUP_WIZARD),
+              )
+
+              HorizontalDivider()
+
+              DropdownMenuItem(
+                text = {
+                  Text(
+                    text = AppLabels.TopBar.restoreFactoryDefaultsMenu,
+                    color = MaterialTheme.colorScheme.error,
+                  )
+                },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.Restore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  if (!state.accessControlConfig.hasPermission(AppPermission.BACKUP_AND_FACTORY_RESET)) {
+                    onShowStatusMessage(
+                      AppLabels.AccessControl.permissionDeniedMessage(AppPermission.BACKUP_AND_FACTORY_RESET),
+                    )
+                  } else {
+                    showGlobalResetConfirmDialog = true
+                  }
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_RESTORE_DEFAULTS),
+              )
+
+              DropdownMenuItem(
+                text = { Text(AppLabels.TopBar.aboutAndPrivacyMenu) },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                  )
+                },
+                onClick = {
+                  showGlobalOverflowMenu = false
+                  globalSettingsDialogCategory = SettingsCategory.ABOUT
+                },
+                modifier = Modifier.testTag(AppTestTags.TopBar.MENU_ABOUT),
+              )
+            }
           }
         },
         colors = TopAppBarDefaults.topAppBarColors(
@@ -522,29 +997,45 @@ internal fun MainDashboardContent(
         MainAppTab.PROFILES -> {
           ExtendedFloatingActionButton(
             onClick = {
-              editingProfile = null
-              showProfileBottomSheet = true
+              if (!state.accessControlConfig.hasPermission(AppPermission.MANAGE_PROFILES)) {
+                onShowStatusMessage(
+                  AppLabels.AccessControl.permissionDeniedMessage(AppPermission.MANAGE_PROFILES),
+                )
+              } else {
+                editingProfile = null
+                showProfileBottomSheet = true
+              }
             },
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text("Novo Perfil") },
-            modifier = Modifier.testTag("save_profile_button"),
+            text = { Text(AppLabels.Fab.newProfile) },
+            modifier = Modifier.testTag(AppTestTags.Fab.SAVE_PROFILE_BUTTON),
           )
         }
         MainAppTab.SCHEDULES -> {
           ExtendedFloatingActionButton(
             onClick = {
-              editingScheduleRule = null
-              showScheduleBottomSheet = true
+              if (!state.accessControlConfig.hasPermission(AppPermission.MANAGE_SCHEDULES)) {
+                onShowStatusMessage(
+                  AppLabels.AccessControl.permissionDeniedMessage(AppPermission.MANAGE_SCHEDULES),
+                )
+              } else {
+                editingScheduleRule = null
+                showScheduleBottomSheet = true
+              }
             },
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text("Novo Horário") },
-            modifier = Modifier.testTag("add_schedule_fab"),
+            text = { Text(AppLabels.Fab.newSchedule) },
+            modifier = Modifier.testTag(AppTestTags.Fab.ADD_SCHEDULE_FAB),
           )
         }
         MainAppTab.LOCATIONS -> {
           ExtendedFloatingActionButton(
             onClick = {
-              if (!state.hasAcceptedLocationDisclosure) {
+              if (!state.accessControlConfig.hasPermission(AppPermission.MANAGE_LOCATIONS)) {
+                onShowStatusMessage(
+                  AppLabels.AccessControl.permissionDeniedMessage(AppPermission.MANAGE_LOCATIONS),
+                )
+              } else if (!state.hasAcceptedLocationDisclosure) {
                 showLocationDisclosureDialog = true
               } else {
                 editingLocationRule = null
@@ -552,8 +1043,8 @@ internal fun MainDashboardContent(
               }
             },
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text("Novo Local") },
-            modifier = Modifier.testTag("add_location_fab"),
+            text = { Text(AppLabels.Fab.newLocation) },
+            modifier = Modifier.testTag(AppTestTags.Fab.ADD_LOCATION_FAB),
           )
         }
         else -> {}
@@ -607,12 +1098,21 @@ internal fun MainDashboardContent(
           state = state,
           onActivateProfile = { profile ->
             onActivateProfile(profile)
-            selectedTab = MainAppTab.NOW
+            if (state.accessControlConfig.hasPermission(AppPermission.CHANGE_SOUND_AND_TIMER)) {
+              selectedTab = MainAppTab.NOW
+            }
           },
           onEditProfile = { profile ->
-            editingProfile = profile
-            showProfileBottomSheet = true
+            if (!state.accessControlConfig.hasPermission(AppPermission.MANAGE_PROFILES)) {
+              onShowStatusMessage(
+                AppLabels.AccessControl.permissionDeniedMessage(AppPermission.MANAGE_PROFILES),
+              )
+            } else {
+              editingProfile = profile
+              showProfileBottomSheet = true
+            }
           },
+          onDuplicateProfile = onDuplicateProfile,
           onDeleteProfile = onDeleteCustomProfile,
           onSetDefaultDayProfileId = onSetDefaultDayProfileId,
           modifier = Modifier.padding(innerPadding),
@@ -626,9 +1126,16 @@ internal fun MainDashboardContent(
           canScheduleExactAlarms = state.canScheduleExactAlarms,
           onToggleRule = onToggleScheduleRule,
           onEditRule = { rule ->
-            editingScheduleRule = rule
-            showScheduleBottomSheet = true
+            if (!state.accessControlConfig.hasPermission(AppPermission.MANAGE_SCHEDULES)) {
+              onShowStatusMessage(
+                AppLabels.AccessControl.permissionDeniedMessage(AppPermission.MANAGE_SCHEDULES),
+              )
+            } else {
+              editingScheduleRule = rule
+              showScheduleBottomSheet = true
+            }
           },
+          onDuplicateRule = onDuplicateScheduleRule,
           onDeleteRule = onDeleteScheduleRule,
           onRequestExactAlarmPermission = onRequestExactAlarmPermission,
           modifier = Modifier.padding(innerPadding),
@@ -642,34 +1149,21 @@ internal fun MainDashboardContent(
           onToggleRule = onToggleLocationRule,
           onTogglePresence = onToggleLocationPresence,
           onEditRule = { rule ->
-            editingLocationRule = rule
-            showLocationBottomSheet = true
+            if (!state.accessControlConfig.hasPermission(AppPermission.MANAGE_LOCATIONS)) {
+              onShowStatusMessage(
+                AppLabels.AccessControl.permissionDeniedMessage(AppPermission.MANAGE_LOCATIONS),
+              )
+            } else {
+              editingLocationRule = rule
+              showLocationBottomSheet = true
+            }
           },
           onDeleteRule = onDeleteLocationRule,
           onSyncGpsCoordinates = onSyncLocationsWithGps,
           onShowStatusMessage = onShowStatusMessage,
-          modifier = Modifier.padding(innerPadding),
-        )
-      }
-
-      MainAppTab.SETTINGS -> {
-        SettingsAndProfilesTabContent(
-          state = state,
-          onSetRestorePolicy = onSetRestorePolicy,
-          onSetThemeMode = onSetThemeMode,
-          onSetUseDynamicColor = onSetUseDynamicColor,
-          onSetMuteMediaOnSilent = onSetMuteMediaOnSilent,
-          onSetPreserveMediaOnBluetooth = onSetPreserveMediaOnBluetooth,
-          onSetSmartVolumeTriggerEnabled = onSetSmartVolumeTriggerEnabled,
-          onSetPersistentQuickBarEnabled = onSetPersistentQuickBarEnabled,
-          onRequestAddQuickTile = onRequestAddQuickTile,
-          onSetQuickTileSlotProfileId = onSetQuickTileSlotProfileId,
-          onTestSmartNotification = onTestSmartNotification,
-          onPinHomeWidget = onPinHomeWidget,
-          onRequestDndPermission = onRequestDndPermission,
-          onRequestExactAlarmPermission = onRequestExactAlarmPermission,
-          onRequestNotificationPermission = onRequestNotificationPermission,
-          onClearLogs = onClearLogs,
+          hasAcceptedLocationDisclosure = state.hasAcceptedLocationDisclosure,
+          onAcceptLocationDisclosure = onAcceptLocationDisclosure,
+          onSyncBackgroundGeofencesNow = onSyncBackgroundGeofencesNow,
           modifier = Modifier.padding(innerPadding),
         )
       }
@@ -696,7 +1190,7 @@ private fun NowTabContent(
   LazyColumn(
     modifier = modifier
       .fillMaxSize()
-      .testTag("now_tab_list"),
+      .testTag(AppTestTags.Now.LIST),
     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
@@ -784,7 +1278,7 @@ private fun UnifiedHeroAndModeCard(
   Card(
     modifier = Modifier
       .fillMaxWidth()
-      .testTag("hero_mode_card"),
+      .testTag(AppTestTags.Now.HERO_MODE_CARD),
     shape = RoundedCornerShape(28.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -841,7 +1335,7 @@ private fun UnifiedHeroAndModeCard(
               val cleanSubtitle = when {
                 activeRuleTitle != null -> activeRuleTitle
                 currentMode != SoundMode.NORMAL ->
-                  "${currentMode.subtitle} • Mídia ${mediaPercent}%"
+                  AppLabels.Now.modeWithMediaSubtitle(currentMode.subtitle, mediaPercent)
                 else -> activeRuleSubtitle ?: currentMode.subtitle
               }
               Text(
@@ -861,7 +1355,7 @@ private fun UnifiedHeroAndModeCard(
             modifier = Modifier
               .clip(RoundedCornerShape(14.dp))
               .clickable(onClick = onOpenProfilesTab)
-              .testTag("active_profile_chip"),
+              .testTag(AppTestTags.Now.ACTIVE_PROFILE_CHIP),
             shape = RoundedCornerShape(14.dp),
             color = animatedOnContainer.copy(alpha = 0.14f),
           ) {
@@ -877,7 +1371,7 @@ private fun UnifiedHeroAndModeCard(
                 modifier = Modifier.size(15.dp),
               )
               Text(
-                text = activeProfile?.name ?: "Perfis",
+                text = activeProfile?.name ?: AppLabels.Tabs.profilesLabel,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = animatedOnContainer,
@@ -928,8 +1422,8 @@ private fun UnifiedHeroAndModeCard(
               .heightIn(min = 48.dp)
               .clip(RoundedCornerShape(18.dp))
               .clickable { onSelectMode(mode) }
-              .semantics { contentDescription = "Modo ${mode.title}" }
-              .testTag("mode_button_${mode.name}"),
+              .semantics { contentDescription = AppLabels.Now.modeContentDescription(mode) }
+              .testTag(AppTestTags.Now.modeButton(mode)),
             shape = RoundedCornerShape(18.dp),
             color = chipBg,
           ) {
@@ -948,11 +1442,7 @@ private fun UnifiedHeroAndModeCard(
               )
               Spacer(modifier = Modifier.width(5.dp))
               Text(
-                text = when (mode) {
-                  SoundMode.NORMAL -> "Som"
-                  SoundMode.VIBRATE -> "Vibrar"
-                  SoundMode.SILENT -> "Silêncio"
-                },
+                text = AppLabels.Now.modeShortPill(mode),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = chipContent,
@@ -994,9 +1484,9 @@ private fun UnifiedHeroAndModeCard(
               val remainingMinutes = activeTimer?.remainingMinutes(System.currentTimeMillis())
               Text(
                 text = if (activeTimer != null && remainingMinutes != null && remainingMinutes > 0) {
-                  "Volta em ${remainingMinutes}m"
+                  AppLabels.Now.remainingTimerLabel(remainingMinutes)
                 } else {
-                  "Manter por:"
+                  AppLabels.Now.keepForLabel
                 },
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1013,12 +1503,13 @@ private fun UnifiedHeroAndModeCard(
                 Surface(
                   modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .clickable { onExtendTimer(30) },
+                    .clickable { onExtendTimer(30) }
+                    .testTag(AppTestTags.Now.EXTEND_TIMER_BUTTON),
                   shape = RoundedCornerShape(50),
                   color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
                   Text(
-                    text = "+30m",
+                    text = AppLabels.Now.extend30MinChip,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -1030,10 +1521,10 @@ private fun UnifiedHeroAndModeCard(
                 FilledTonalButton(
                   onClick = onCancelTimer,
                   contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                  modifier = Modifier.testTag("cancel_timer_button"),
+                  modifier = Modifier.testTag(AppTestTags.Now.CANCEL_TIMER_BUTTON),
                 ) {
                   Text(
-                    text = "Restaurar",
+                    text = AppLabels.Common.restore,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                     softWrap = false,
@@ -1047,7 +1538,7 @@ private fun UnifiedHeroAndModeCard(
                     modifier = Modifier
                       .clip(RoundedCornerShape(50))
                       .clickable { onStartTimer(minutes) }
-                      .testTag("timer_chip_$minutes"),
+                      .testTag(AppTestTags.Now.timerChip(minutes)),
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                   ) {
@@ -1078,7 +1569,7 @@ private fun ManualOverrideBanner(
   Card(
     modifier = Modifier
       .fillMaxWidth()
-      .testTag("manual_override_banner"),
+      .testTag(AppTestTags.Now.MANUAL_OVERRIDE_BANNER),
     shape = RoundedCornerShape(22.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -1093,20 +1584,20 @@ private fun ManualOverrideBanner(
     ) {
       Column(modifier = Modifier.weight(1f)) {
         Text(
-          text = "Ajustado manualmente",
+          text = AppLabels.Now.manualOverrideTitle,
           style = MaterialTheme.typography.titleSmall,
           fontWeight = FontWeight.SemiBold,
           color = MaterialTheme.colorScheme.onSecondaryContainer,
         )
         Text(
-          text = "Retoma a rotina no próximo horário",
+          text = AppLabels.Now.manualOverrideSubtitle,
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
         )
       }
       FilledTonalButton(
         onClick = onReapplyActiveRule,
-        modifier = Modifier.testTag("reapply_rule_button"),
+        modifier = Modifier.testTag(AppTestTags.Now.REAPPLY_RULE_BUTTON),
       ) {
         Icon(
           imageVector = Icons.Default.Refresh,
@@ -1114,7 +1605,7 @@ private fun ManualOverrideBanner(
           modifier = Modifier.size(16.dp),
         )
         Spacer(modifier = Modifier.width(6.dp))
-        Text("Reaplicar")
+        Text(AppLabels.Now.reapplyButton)
       }
     }
   }
@@ -1127,7 +1618,7 @@ private fun DndPermissionBanner(
   Card(
     modifier = Modifier
       .fillMaxWidth()
-      .testTag("dnd_permission_banner"),
+      .testTag(AppTestTags.Now.DND_PERMISSION_BANNER),
     shape = RoundedCornerShape(22.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -1152,20 +1643,23 @@ private fun DndPermissionBanner(
         )
         Column {
           Text(
-            text = "Permissão Não Perturbe",
+            text = AppLabels.Now.dndBannerTitle,
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onErrorContainer,
           )
           Text(
-            text = "Necessária para o modo Silencioso",
+            text = AppLabels.Now.dndBannerSubtitle,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f),
           )
         }
       }
-      Button(onClick = onRequestDndPermission) {
-        Text("Ativar")
+      Button(
+        onClick = onRequestDndPermission,
+        modifier = Modifier.testTag(AppTestTags.Now.DND_ENABLE_BUTTON),
+      ) {
+        Text(AppLabels.Common.enable)
       }
     }
   }
@@ -1190,7 +1684,7 @@ private fun VolumeStreamsCard(
       verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       Text(
-        text = "Volumes",
+        text = AppLabels.Now.volumesTitle,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(bottom = 2.dp),

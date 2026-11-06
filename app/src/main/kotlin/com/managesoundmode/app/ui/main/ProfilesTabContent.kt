@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Edit
@@ -51,6 +52,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.managesoundmode.app.domain.model.SoundProfile
+import com.managesoundmode.app.ui.common.AppLabels
+import com.managesoundmode.app.ui.common.AppTestTags
 import com.managesoundmode.app.ui.components.groupedCardShape
 import com.managesoundmode.app.ui.components.profileIconForKey
 import com.managesoundmode.app.ui.theme.onTonalContainerColor
@@ -64,6 +67,7 @@ fun ProfilesTabContent(
   onEditProfile: (SoundProfile) -> Unit,
   onSetDefaultDayProfileId: (String) -> Unit,
   onDeleteProfile: (String) -> Unit = {},
+  onDuplicateProfile: (SoundProfile) -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val canDeleteProfiles = state.profiles.size > 1
@@ -71,13 +75,13 @@ fun ProfilesTabContent(
   LazyColumn(
     modifier = modifier
       .fillMaxSize()
-      .testTag("profiles_tab_list"),
+      .testTag(AppTestTags.Profiles.LIST),
     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
     verticalArrangement = Arrangement.spacedBy(3.dp),
   ) {
     item {
       Text(
-        text = "Toque para ativar • Pressione e segure para editar ou excluir",
+        text = AppLabels.Profiles.listHint,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
@@ -100,67 +104,10 @@ fun ProfilesTabContent(
         shape = groupedCardShape(index = index, totalCount = state.profiles.size),
         onActivate = { onActivateProfile(profile) },
         onEdit = { onEditProfile(profile) },
+        onDuplicate = { onDuplicateProfile(profile) },
         onSetDefault = { onSetDefaultDayProfileId(profile.id) },
         onDelete = { onDeleteProfile(profile.id) },
       )
-    }
-
-    item {
-      Spacer(modifier = Modifier.height(14.dp))
-      Text(
-        text = "Perfil Padrão de Retorno",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onBackground,
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(bottom = 6.dp),
-      )
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-          containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-      ) {
-        Column(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(18.dp),
-          verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-          Text(
-            text = "Aplicado automaticamente quando uma rotina de horário ou local chega ao fim.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-          FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            state.profiles.forEach { profile ->
-              val selected = profile.id == state.defaultDayProfileId
-              FilterChip(
-                selected = selected,
-                onClick = { onSetDefaultDayProfileId(profile.id) },
-                label = { Text(profile.name) },
-                leadingIcon = if (selected) {
-                  {
-                    Icon(
-                      imageVector = Icons.Filled.Check,
-                      contentDescription = null,
-                      modifier = Modifier.size(16.dp),
-                    )
-                  }
-                } else {
-                  null
-                },
-                shape = RoundedCornerShape(14.dp),
-              )
-            }
-          }
-        }
-      }
     }
   }
 }
@@ -175,6 +122,7 @@ private fun ProfileGroupedCard(
   shape: RoundedCornerShape,
   onActivate: () -> Unit,
   onEdit: () -> Unit,
+  onDuplicate: () -> Unit,
   onSetDefault: () -> Unit,
   onDelete: () -> Unit,
 ) {
@@ -199,7 +147,7 @@ private fun ProfileGroupedCard(
             showContextMenu = true
           },
         )
-        .testTag("profile_card_${profile.id}"),
+        .testTag(AppTestTags.Profiles.card(profile.id)),
       shape = shape,
       colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
@@ -268,11 +216,11 @@ private fun ProfileGroupedCard(
               onClick = { showContextMenu = true },
               modifier = Modifier
                 .size(36.dp)
-                .testTag("edit_profile_${profile.id}"),
+                .testTag(AppTestTags.Profiles.editButton(profile.id)),
             ) {
               Icon(
                 imageVector = Icons.Default.MoreVert,
-                contentDescription = "Opções do perfil ${profile.name}",
+                contentDescription = AppLabels.Profiles.optionsContentDescription(profile.name),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp),
               )
@@ -283,7 +231,7 @@ private fun ProfileGroupedCard(
               onDismissRequest = { showContextMenu = false },
             ) {
               DropdownMenuItem(
-                text = { Text("Editar perfil") },
+                text = { Text(AppLabels.Profiles.editProfileMenu) },
                 leadingIcon = {
                   Icon(
                     imageVector = Icons.Outlined.Edit,
@@ -294,10 +242,25 @@ private fun ProfileGroupedCard(
                   showContextMenu = false
                   onEdit()
                 },
+                modifier = Modifier.testTag(AppTestTags.Profiles.menuEditItem(profile.id)),
+              )
+              DropdownMenuItem(
+                text = { Text(AppLabels.Profiles.duplicateProfileMenu) },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.ContentCopy,
+                    contentDescription = null,
+                  )
+                },
+                onClick = {
+                  showContextMenu = false
+                  onDuplicate()
+                },
+                modifier = Modifier.testTag(AppTestTags.Profiles.menuDuplicateItem(profile.id)),
               )
               if (!isDefaultRestore) {
                 DropdownMenuItem(
-                  text = { Text("Definir como padrão de retorno") },
+                  text = { Text(AppLabels.Profiles.setDefaultReturnMenu) },
                   leadingIcon = {
                     Icon(
                       imageVector = Icons.Filled.Check,
@@ -308,6 +271,7 @@ private fun ProfileGroupedCard(
                     showContextMenu = false
                     onSetDefault()
                   },
+                  modifier = Modifier.testTag(AppTestTags.Profiles.menuSetDefaultItem(profile.id)),
                 )
               }
               if (canDelete) {
@@ -315,7 +279,7 @@ private fun ProfileGroupedCard(
                 DropdownMenuItem(
                   text = {
                     Text(
-                      text = "Excluir perfil",
+                      text = AppLabels.Profiles.deleteProfileMenu,
                       color = MaterialTheme.colorScheme.error,
                     )
                   },
@@ -330,6 +294,7 @@ private fun ProfileGroupedCard(
                     showContextMenu = false
                     onDelete()
                   },
+                  modifier = Modifier.testTag(AppTestTags.Profiles.menuDeleteItem(profile.id)),
                 )
               }
             }
@@ -363,7 +328,7 @@ private fun ProfileGroupedCard(
               color = MaterialTheme.colorScheme.primary,
             ) {
               Text(
-                text = "Ativo agora",
+                text = AppLabels.Profiles.activeBadge,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -380,7 +345,7 @@ private fun ProfileGroupedCard(
               color = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
               Text(
-                text = "Padrão de retorno",
+                text = AppLabels.Profiles.defaultReturnBadge,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -393,7 +358,7 @@ private fun ProfileGroupedCard(
 
         // Linha 3: Resumo completo dos 4 canais de volume (até 2 linhas em proporção aumentada)
         Text(
-          text = "Toque ${profile.streams.ringPercent}% • Notif ${profile.streams.notificationPercent}% • Mídia ${profile.streams.mediaPercent}% • Alarme ${profile.streams.alarmPercent}%",
+          text = AppLabels.Profiles.streamsSummaryLine(profile.streams),
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           maxLines = 2,

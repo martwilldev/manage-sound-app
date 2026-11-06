@@ -19,6 +19,7 @@
     <!-- Necessário para o Mapa Interativo OpenStreetMap e busca gratuita de endereços em Locais -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <application
         android:name=".ManageSoundApplication"
@@ -42,9 +43,14 @@
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
             </intent-filter>
+            <!-- [AUTO-04] Activity de configuração para Modos do Sistema (AutomaticZenRule) no Android 15+ -->
+            <intent-filter>
+                <action android:name="android.app.action.AUTOMATIC_ZEN_RULE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
-        <!-- Receiver para Alarmes de Horário, Boot do Sistema, Notificações e Widgets -->
+        <!-- Receiver para Alarmes de Horário, Boot do Sistema, Notificações, Modos do Sistema e Geofencing -->
         <receiver
             android:name=".receiver.SystemAutomationReceiver"
             android:enabled="true"
@@ -55,7 +61,11 @@
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+                <action android:name="android.app.action.AUTOMATIC_ZEN_RULE_STATUS_CHANGED" />
                 <action android:name="com.managesoundmode.app.action.EVALUATE_RULES_ALARM" />
+                <action android:name="com.managesoundmode.app.action.GEOFENCE_TRANSITION" />
+                <action android:name="com.managesoundmode.app.action.PASSIVE_LOCATION_UPDATE" />
+                <action android:name="com.managesoundmode.app.action.GEOFENCE_DWELL_CHECK" />
                 <action android:name="com.managesoundmode.app.action.NOTIFICATION_START_TIMER" />
                 <action android:name="com.managesoundmode.app.action.NOTIFICATION_EXTEND_TIMER" />
                 <action android:name="com.managesoundmode.app.action.NOTIFICATION_RESTORE_NOW" />

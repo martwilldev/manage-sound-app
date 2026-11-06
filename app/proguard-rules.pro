@@ -21,7 +21,7 @@
 -keep class com.managesoundmode.app.DashboardKey { *; }
 -keep class * implements androidx.navigation3.runtime.NavKey { *; }
 -keep class com.managesoundmode.app.domain.model.** { *; }
--keep class com.managesoundmode.app.data.local.PersistedSoundPrefs { *; }
+-keep class com.managesoundmode.app.data.local.** { *; }
 
 # Preserva RoomDatabase_Impl (usado internamente pelo WorkManager via reflexão)
 -keep class * extends androidx.room.RoomDatabase {

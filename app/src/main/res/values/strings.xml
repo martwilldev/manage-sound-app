@@ -1,6 +1,9 @@
 <resources>
+    <!-- Identidade do Produto e Sistema -->
     <string name="app_name">Modos de Som</string>
     <string name="widget_description">Alterne entre Som, Vibrar, Silencioso e Perfis em 1 toque direto na tela inicial.</string>
+
+    <!-- Rótulos dos Quick Settings Tiles no Header do Android -->
     <string name="qs_tile_cycle_label">Modo de Som (Ciclo)</string>
     <string name="qs_tile_normal_label">Modo: Som</string>
     <string name="qs_tile_vibrate_label">Modo: Vibrar</string>
@@ -9,4 +12,31 @@
     <string name="qs_tile_profile_2_label">Perfil Rápido 2</string>
     <string name="qs_tile_timer_label">Timer Silêncio</string>
     <string name="qs_tile_media_mute_label">Zero Mídia</string>
+
+    <!-- Navegação Principal (5 Abas) -->
+    <string name="tab_now_label">Agora</string>
+    <string name="tab_now_title">Modos de Som</string>
+    <string name="tab_profiles_label">Perfis</string>
+    <string name="tab_profiles_title">Perfis</string>
+    <string name="tab_schedules_label">Horários</string>
+    <string name="tab_schedules_title">Horários</string>
+    <string name="tab_locations_label">Locais</string>
+    <string name="tab_locations_title">Locais</string>
+    <string name="tab_settings_label">Configurações</string>
+    <string name="tab_settings_title">Configurações</string>
+
+    <!-- Ações Comuns -->
+    <string name="action_back">Voltar</string>
+    <string name="action_create">Criar</string>
+    <string name="action_cancel">Cancelar</string>
+    <string name="action_ok">OK</string>
+    <string name="action_restore">Restaurar</string>
+    <string name="action_allow">Permitir</string>
+    <string name="action_clear">Limpar</string>
+    <string name="label_auto_saved">Salvo automaticamente</string>
+
+    <!-- FABs -->
+    <string name="fab_new_profile">Novo Perfil</string>
+    <string name="fab_new_schedule">Novo Horário</string>
+    <string name="fab_new_location">Novo Local</string>
 </resources>
