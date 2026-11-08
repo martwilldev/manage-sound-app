@@ -1,38 +1,37 @@
 # AGENTS.md — manage-sound-app
 
-> Este repositório faz parte do ecossistema **Manage Sound Mode**.  
-> Além das regras locais abaixo, siga sempre as diretrizes globais da raiz em [`../../AGENTS.md`](../../AGENTS.md) e o estado global em [`../../STATE.md`](../../STATE.md).
+> Este repositório faz parte do ecossistema **Manage Sound Mode (Modos de Som)**.  
+> Siga sempre as diretrizes de arquitetura, qualidade e segurança abaixo ao evoluir o aplicativo.
 
 ---
 
 ## 1. Visão Geral do Repositório
 
-* **Nome**: `manage-sound-app`
-* **Descrição**: Aplicativo Android nativo (Kotlin + Jetpack Compose) para gerenciamento, perfis e automação de modos de som.
-* **Localização no Workspace**: `repos/manage-sound-app/`
+* **Nome**: `manage-sound-app` (`com.managesoundmode.app`)
+* **Descrição**: Aplicativo Android nativo 100% *on-device* para gerenciamento, perfis e automação contextual de modos de som, horários e locais/Wi-Fi.
+* **Repositório Público (Portfólio & Produção)**: `https://github.com/martwilldev/manage-sound-app`
 * **Stack Principal**:
-  * **Android Gradle Plugin (AGP)**: `9.0.1` (Java 17 toolchain)
+  * **Android Gradle Plugin (AGP)**: `9.0.1` (JDK 17 toolchain, `compileSdk = 36`, `targetSdk = 36`, `minSdk = 29`)
   * **Kotlin**: `2.3.20` (`compose`, `serialization`)
-  * **Jetpack Compose BOM**: `2026.03.01` (Material 3, Edge-to-Edge, Material Icons Extended)
+  * **Jetpack Compose BOM**: `2026.03.01` (Material 3 Expressive — *Zenith Design System*)
   * **Jetpack Navigation 3**: `1.0.1` (`navigation3-runtime`, `navigation3-ui`, `lifecycle-viewmodel-navigation3:2.10.0`)
-  * **Jetpack Lifecycle**: `2.10.0` (`collectAsStateWithLifecycle`, `LifecycleResumeEffect`, `ViewModel`)
+  * **Jetpack Glance**: `1.1.1` (`glance-appwidget`, `glance-material3`)
   * **Jetpack DataStore**: `1.1.7` (`datastore-preferences`)
   * **Jetpack WorkManager**: `2.10.1` (`work-runtime-ktx`)
-  * **Kotlin Coroutines & Serialization**: `coroutines:1.10.2`, `kotlinx-serialization-json:1.9.0`
 
 ---
 
 ## 2. Comandos Essenciais
 
 ```bash
-# Rodar testes unitários (JUnit 4 + Coroutines Test)
-./gradlew testDebugUnitTest
+# 1. Rodar suíte de testes unitários + Android Lint Release (Quality Gate)
+./gradlew testDebugUnitTest lintRelease --no-daemon
 
-# Compilar APK de Debug
-./gradlew assembleDebug
+# 2. Compilar APK de Debug
+./gradlew assembleDebug --no-daemon
 
-# Compilar e instalar no emulador/dispositivo conectado via Android CLI
-android run
+# 3. Executar esteira CI/CD local em modo validação (Dry-Run)
+./scripts/ci-pipeline.sh
 ```
 
 ---
@@ -41,34 +40,50 @@ android run
 
 ```text
 manage-sound-app/
+├── .github/
+│   ├── CODEOWNERS                  # Exige revisão de @martwilldev em qualquer PR
+│   └── workflows/android-ci-cd.yml # Esteira CI/CD blindada (Quality Gate + Google Play API v3)
 ├── app/
 │   ├── build.gradle.kts
+│   ├── proguard-rules.pro          # Regras R8 para Serialization, Nav3, Glance e WorkManager
 │   └── src/
 │       ├── main/kotlin/com/managesoundmode/app/
-│       │   ├── domain/model/       # SoundMode, VolumeStreams, SoundProfile, TimedModeSession
+│       │   ├── domain/
+│       │   │   ├── engine/         # RuleEvaluator (Máquina de estados determinística)
+│       │   │   └── model/          # SoundMode, SoundProfile, AutomationModels, AccessControlModels
 │       │   ├── data/
-│       │   │   ├── system/         # AndroidSoundSystemController (AudioManager + NotificationManager)
-│       │   │   ├── local/          # DataStoreSoundPreferencesDataSource (Jetpack DataStore)
-│       │   │   └── repository/     # SoundModeRepository & DefaultSoundModeRepository (SSOT)
+│       │   │   ├── system/         # SoundSystemController (AudioManager + NotificationManager)
+│       │   │   ├── local/          # SoundPreferencesDataSource (DataStore + Backup Sanitizado)
+│       │   │   └── repository/     # SoundModeRepository (Single Source of Truth)
+│       │   ├── system/             # InternalIntentSecurity, BackgroundGeofenceManager,
+│       │   │                       # ExactRuleAlarmScheduler, SmartNotificationManager,
+│       │   │                       # SystemZenRuleManager, AppShortcutsManager, LocationProximityHelper
+│       │   ├── receiver/           # SystemAutomationReceiver (Autenticado via InternalIntentSecurity)
+│       │   ├── tile/               # SoundModeTileService (8 Quick Settings Tiles sincronizados)
+│       │   ├── widget/             # SoundModeGlanceWidget (Widgets 2x1, 4x1 e 4x2)
 │       │   ├── work/               # RestoreSoundModeWorker (WorkManager auto-restore)
-│       │   ├── di/                 # AppContainer & DefaultAppContainer
 │       │   ├── ui/
-│       │   │   ├── theme/          # Tokens Dark-First & cores semânticas (DESIGN_SYSTEM.md)
-│       │   │   └── main/           # MainScreen & MainScreenViewModel (UDF + StateFlow)
+│       │   │   ├── common/         # AppLabels (i18n PT-BR/EN) & AppTestTags
+│       │   │   ├── components/     # SystemComponents, FirstRunOnboardingDialog, GeofenceMapPickerCard
+│       │   │   ├── theme/          # Zenith Theme (Noite Boreal Dark & Alvorada Nórdica Light)
+│       │   │   └── main/           # MainScreen, MainScreenViewModel e conteúdos das 5 abas
 │       │   ├── MainActivity.kt
-│       │   ├── Navigation.kt       # Jetpack Navigation 3 (NavDisplay + entryProvider)
+│       │   ├── Navigation.kt
 │       │   └── NavigationKeys.kt
-│       ├── test/                   # Testes unitários rápidos com Fakes
-│       └── androidTest/            # Testes instrumentados de UI Compose
-├── gradle/libs.versions.toml       # Version Catalog centralizado
-├── AGENTS.md
+│       ├── test/                   # Testes unitários (RuleEvaluatorTest, MainScreenViewModelTest)
+│       └── androidTest/            # Testes instrumentados de UI e E2E (MainScreenTest, ManageSoundModeE2ETest)
+├── docs/PRIVACY_POLICY.md          # Política de Privacidade Bilíngue (100% On-Device)
+├── scripts/                        # Scripts de automação CI/CD e guarda Pre-Commit
+├── LICENSE                         # Portfolio & Source-Available License
+├── SECURITY.md                     # Política de Segurança e Arquitetura de Proteção
 └── README.md
 ```
 
 ---
 
-## 4. Regras Específicas deste Repositório
+## 4. Regras de Segurança e Qualidade (Obrigatórias)
 
-1. **Unidirectional Data Flow (UDF)**: `ViewModel` nunca deve receber `Context` ou `Activity`. Use `collectAsStateWithLifecycle()` nas telas Compose.
-2. **Permissão DND (`NotificationManager`)**: Antes de aplicar `SoundMode.SILENT`, sempre verifique `hasDndPermission()`. Se ausente, exiba o banner educativo que direciona para `Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS`.
-3. **Validação**: Nunca finalize uma tarefa sem rodar `./gradlew testDebugUnitTest assembleDebug`.
+1. **Zero Vazamento de Segredos**: Nunca comite `.env`, `.jks`, `keystore.properties`, `*service-account*.json`, `.apk` ou `.aab`. Mantenha o hook [`scripts/git-pre-commit-guard.sh`](./scripts/git-pre-commit-guard.sh) ativo.
+2. **Proteção contra Intent Spoofing (`InternalIntentSecurity`)**: Toda nova `PendingIntent` destinada ao `SystemAutomationReceiver` ou à `MainActivity` deve ser assinada com `InternalIntentSecurity.signIntent(context, intent)`.
+3. **Respeito ao RBAC (`AccessControlConfig`)**: Ações iniciadas pelo usuário (inclusive via Widgets, Notificações ou Shortcuts) devem respeitar as permissões do papel ativo (`AppPermission.CHANGE_SOUND_AND_TIMER`).
+4. **Verificação Obrigatória**: Sempre execute `./gradlew testDebugUnitTest lintRelease` antes de qualquer commit.

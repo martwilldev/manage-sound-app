@@ -57,7 +57,7 @@ object AppShortcutsManager {
       action = Intent.ACTION_VIEW
       putExtra(EXTRA_SHORTCUT_ACTION, actionKey)
       flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-    }
+    }.also { InternalIntentSecurity.signIntent(context, it) }
 
   fun resolveProfileIdForShortcut(actionKey: String): String? = when (actionKey) {
     ACTION_PROFILE_WORK -> "preset_work_high"

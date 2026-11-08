@@ -10,8 +10,10 @@ import android.location.LocationManager
 import android.os.Build
 import android.util.Log
 import com.managesoundmode.app.ManageSoundApplication
+import com.managesoundmode.app.domain.model.AppPermission
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.TransitionTriggerSource
+import com.managesoundmode.app.system.InternalIntentSecurity
 import com.managesoundmode.app.system.LocationProximityHelper
 import com.managesoundmode.app.system.SystemZenRuleManager
 import kotlinx.coroutines.CoroutineScope
@@ -26,10 +28,22 @@ class SystemAutomationReceiver : BroadcastReceiver() {
     val app = context?.applicationContext as? ManageSoundApplication ?: return
     val action = intent?.action ?: return
 
+    // Bloqueia Intent Spoofing de terceiros em actions internas customizadas
+    if (action.startsWith("com.managesoundmode.app.action.") &&
+      !InternalIntentSecurity.verifyIntent(app, intent)
+    ) {
+      Log.w(TAG, "Broadcast externo não autenticado bloqueado: $action")
+      return
+    }
+
     val pendingResult = goAsync()
     CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
       try {
         val repo = app.container.soundModeRepository
+        suspend fun canChangeSound(): Boolean =
+          repo.preferencesStream.first().accessControlConfig.hasPermission(
+            AppPermission.CHANGE_SOUND_AND_TIMER,
+          )
         when (action) {
           ACTION_EVALUATE_RULES_ALARM -> {
             repo.evaluateAndApplyRules(source = TransitionTriggerSource.SCHEDULE)
@@ -103,36 +117,43 @@ class SystemAutomationReceiver : BroadcastReceiver() {
           }
 
           ACTION_NOTIFICATION_START_TIMER -> {
-            val minutes = intent.getIntExtra(EXTRA_DURATION_MINUTES, 60).coerceAtLeast(1)
+            if (!canChangeSound()) return@launch
+            val minutes = intent.getIntExtra(EXTRA_DURATION_MINUTES, 60).coerceIn(1, 720)
             val currentMode = app.container.soundSystemController.readCurrentMode()
             val targetMode = if (currentMode == SoundMode.NORMAL) SoundMode.VIBRATE else currentMode
             repo.startTimedSession(targetMode = targetMode, durationMinutes = minutes)
           }
 
           ACTION_NOTIFICATION_EXTEND_TIMER -> {
-            val addMinutes = intent.getIntExtra(EXTRA_DURATION_MINUTES, 30).coerceAtLeast(1)
+            if (!canChangeSound()) return@launch
+            val addMinutes = intent.getIntExtra(EXTRA_DURATION_MINUTES, 30).coerceIn(1, 720)
             repo.extendTimedSession(additionalMinutes = addMinutes)
           }
 
           ACTION_NOTIFICATION_RESTORE_NOW -> {
+            if (!canChangeSound()) return@launch
             repo.cancelOrRestoreTimedSession()
           }
 
           ACTION_NOTIFICATION_REAPPLY_RULE -> {
+            if (!canChangeSound()) return@launch
             repo.reapplyActiveRule()
           }
 
           ACTION_WIDGET_SET_MODE -> {
+            if (!canChangeSound()) return@launch
             val modeRaw = intent.getStringExtra(EXTRA_SOUND_MODE) ?: return@launch
             val targetMode = runCatching { SoundMode.valueOf(modeRaw) }.getOrNull() ?: return@launch
             repo.setSoundMode(targetMode, source = TransitionTriggerSource.WIDGET)
           }
 
           ACTION_WIDGET_CYCLE_MODE -> {
+            if (!canChangeSound()) return@launch
             repo.cycleSoundModeFromQuickTile()
           }
 
           ACTION_ACTIVATE_PROFILE -> {
+            if (!canChangeSound()) return@launch
             val profileId = intent.getStringExtra(EXTRA_PROFILE_ID) ?: return@launch
             val profiles = repo.profilesStream.first()
             val target = profiles.firstOrNull { it.id == profileId } ?: return@launch

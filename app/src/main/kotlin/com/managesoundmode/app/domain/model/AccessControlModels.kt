@@ -1,6 +1,7 @@
 package com.managesoundmode.app.domain.model
 
 import com.managesoundmode.app.ui.common.AppLabels
+import java.security.MessageDigest
 import kotlinx.serialization.Serializable
 
 /**
@@ -73,8 +74,33 @@ data class AccessControlConfig(
       permission in grantedPermissions
     }
 
-  fun verifyPin(inputPin: String): Boolean =
-    pinCode.isNullOrBlank() || pinCode == inputPin.trim()
+  fun verifyPin(inputPin: String): Boolean {
+    val stored = pinCode?.trim()
+    if (stored.isNullOrBlank()) return true
+    val candidate = inputPin.trim()
+    return if (stored.startsWith(SHA256_PREFIX)) {
+      val candidateHash = hashPin(candidate)
+      MessageDigest.isEqual(
+        stored.toByteArray(Charsets.UTF_8),
+        candidateHash.toByteArray(Charsets.UTF_8),
+      )
+    } else {
+      MessageDigest.isEqual(
+        stored.toByteArray(Charsets.UTF_8),
+        candidate.toByteArray(Charsets.UTF_8),
+      )
+    }
+  }
+
+  companion object {
+    private const val SHA256_PREFIX = "sha256:"
+
+    fun hashPin(rawPin: String): String {
+      val digest = MessageDigest.getInstance("SHA-256")
+        .digest(rawPin.trim().toByteArray(Charsets.UTF_8))
+      return SHA256_PREFIX + digest.joinToString("") { "%02x".format(it) }
+    }
+  }
 
   fun withRole(newRole: AppAccessRole): AccessControlConfig =
     when (newRole) {

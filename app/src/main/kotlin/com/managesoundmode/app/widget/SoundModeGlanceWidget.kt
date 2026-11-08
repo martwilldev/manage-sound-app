@@ -51,6 +51,7 @@ import com.managesoundmode.app.MainActivity
 import com.managesoundmode.app.ManageSoundApplication
 import com.managesoundmode.app.R
 import com.managesoundmode.app.data.local.PersistedSoundPrefs
+import com.managesoundmode.app.domain.model.AppPermission
 import com.managesoundmode.app.domain.model.DeviceSoundSnapshot
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.SoundProfile
@@ -71,6 +72,10 @@ class SoundModeWidgetActionCallback : ActionCallback {
   ) {
     val app = context.applicationContext as? ManageSoundApplication ?: return
     val repo = app.container.soundModeRepository
+    val prefs = repo.preferencesStream.first()
+    if (!prefs.accessControlConfig.hasPermission(AppPermission.CHANGE_SOUND_AND_TIMER)) {
+      return
+    }
 
     val command = parameters[KEY_COMMAND] ?: return
     when (command) {

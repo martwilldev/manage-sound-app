@@ -14,9 +14,11 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.managesoundmode.app.data.local.PersistedSoundPrefs
+import com.managesoundmode.app.domain.model.AppPermission
 import com.managesoundmode.app.domain.model.SoundMode
 import com.managesoundmode.app.domain.model.TransitionTriggerSource
 import com.managesoundmode.app.system.AppShortcutsManager
+import com.managesoundmode.app.system.InternalIntentSecurity
 import com.managesoundmode.app.ui.theme.ManageSoundModeTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -55,10 +57,17 @@ class MainActivity : ComponentActivity() {
   private fun handleShortcutIntent(intent: Intent?) {
     val actionKey = intent?.getStringExtra(AppShortcutsManager.EXTRA_SHORTCUT_ACTION) ?: return
     intent.removeExtra(AppShortcutsManager.EXTRA_SHORTCUT_ACTION)
+    if (!InternalIntentSecurity.verifyIntent(this, intent)) {
+      return
+    }
     val app = applicationContext as? ManageSoundApplication ?: return
     val repo = app.container.soundModeRepository
 
     lifecycleScope.launch {
+      val prefs = repo.preferencesStream.first()
+      if (!prefs.accessControlConfig.hasPermission(AppPermission.CHANGE_SOUND_AND_TIMER)) {
+        return@launch
+      }
       when (actionKey) {
         AppShortcutsManager.ACTION_SILENCE_1H -> {
           repo.startTimedSession(targetMode = SoundMode.VIBRATE, durationMinutes = 60)

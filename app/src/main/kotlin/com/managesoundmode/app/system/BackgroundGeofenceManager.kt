@@ -207,6 +207,7 @@ object BackgroundGeofenceManager {
       action = SystemAutomationReceiver.ACTION_GEOFENCE_TRANSITION
       putExtra(SystemAutomationReceiver.EXTRA_LOCATION_RULE_ID, ruleId)
     }
+    InternalIntentSecurity.signIntent(context, intent)
     val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
     return PendingIntent.getBroadcast(
       context,
@@ -220,6 +221,7 @@ object BackgroundGeofenceManager {
     val intent = Intent(context, SystemAutomationReceiver::class.java).apply {
       action = SystemAutomationReceiver.ACTION_PASSIVE_LOCATION_UPDATE
     }
+    InternalIntentSecurity.signIntent(context, intent)
     val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
     return PendingIntent.getBroadcast(
       context,
@@ -233,6 +235,7 @@ object BackgroundGeofenceManager {
     val intent = Intent(context, SystemAutomationReceiver::class.java).apply {
       action = SystemAutomationReceiver.ACTION_GEOFENCE_DWELL_CHECK
     }
+    InternalIntentSecurity.signIntent(context, intent)
     val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     return PendingIntent.getBroadcast(
       context,

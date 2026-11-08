@@ -57,6 +57,7 @@ object ExactRuleAlarmScheduler {
     val intent = Intent(context, SystemAutomationReceiver::class.java).apply {
       action = SystemAutomationReceiver.ACTION_EVALUATE_RULES_ALARM
     }
+    InternalIntentSecurity.signIntent(context, intent)
     return PendingIntent.getBroadcast(
       context,
       ALARM_REQUEST_CODE,

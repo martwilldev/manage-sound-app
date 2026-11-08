@@ -1,5 +1,6 @@
 package com.managesoundmode.app.domain.engine
 
+import com.managesoundmode.app.domain.model.AccessControlConfig
 import com.managesoundmode.app.domain.model.LocationRule
 import com.managesoundmode.app.domain.model.RestorePolicy
 import com.managesoundmode.app.domain.model.ScheduleRule
@@ -223,5 +224,18 @@ class RuleEvaluatorTest {
       .toInstant()
       .toEpochMilli()
     assertEquals(expectedEightThirty, nextMillis)
+  }
+
+  @Test
+  fun accessControlConfig_verifyPin_supportsSha256AndConstantTimeComparison() {
+    val hashedPin = AccessControlConfig.hashPin("7391")
+    assertTrue(hashedPin.startsWith("sha256:"))
+    val configHashed = AccessControlConfig(pinCode = hashedPin)
+    assertTrue(configHashed.verifyPin("7391"))
+    assertTrue(!configHashed.verifyPin("0000"))
+
+    val configPlain = AccessControlConfig(pinCode = "4210")
+    assertTrue(configPlain.verifyPin("4210"))
+    assertTrue(!configPlain.verifyPin("9999"))
   }
 }

@@ -15,8 +15,10 @@ O **Modos de Som (Manage Sound Mode)** foi projetado sob os princípios de **Pri
 
 1. **Execução 100% Local:** O aplicativo não possui servidores de backend, não realiza chamadas de telemetria/analytics e não exige login ou criação de conta.
 2. **Isolamento de Dados (`Jetpack DataStore`):** Perfis de som, agendas de horário, cercas geográficas (latitude/longitude/raio) e SSIDs de Wi-Fi são armazenados estritamente no diretório privado interno do aplicativo (`/data/data/com.managesoundmode.app/`), protegido pelo sandbox de UID do Linux/Android.
-3. **Controle de Acesso Interno (RBAC + PIN Lock):** A aba de configurações e regras críticas suportam bloqueio por PIN e perfis de permissão internos (`Admin`, `Standard`, `QuickOnly` / Modo Kiosk/Criança).
-4. **Esteira CI/CD Blindada:**
+3. **Controle de Acesso Interno (RBAC + PIN Lock):** A aba de configurações e regras críticas suportam bloqueio por PIN (verificado em tempo constante via `MessageDigest.isEqual` com suporte a hash `SHA-256` e omitido automaticamente em exportações de backup JSON) e perfis de permissão internos (`ADMIN`, `OPERATOR`, `VIEWER`, `CUSTOM`) aplicados inclusive em Widgets, Notificações e App Shortcuts.
+4. **Proteção Criptográfica contra Intent Spoofing (`InternalIntentSecurity`):** Como o código-fonte do repositório é público, todas as `PendingIntent`s internas (`AlarmManager`, `LocationManager`, `NotificationManager` e `ShortcutManager`) são assinadas com um token aleatório de **256 bits (`SecureRandom`)** exclusivo por instalação (`internal_security_prefs.xml`, excluído de backup em nuvem). O `SystemAutomationReceiver` e a `MainActivity` rejeitam qualquer broadcast ou intent externa não autenticada.
+5. **WebView Blindado com Subresource Integrity (`GeofenceMapPickerCard`):** O seletor de mapa OpenStreetMap opera com `allowFileAccess = false`, `allowContentAccess = false`, `MIXED_CONTENT_NEVER_ALLOW`, bloqueio de navegação externa (`shouldOverrideUrlLoading = true`) e verificação criptográfica **SRI SHA-256** para os scripts Leaflet `1.9.4`.
+6. **Esteira CI/CD Blindada:**
    * Nenhum segredo, keystore (`.jks`) ou credencial do Google Cloud (`.json`) é versionado no Git.
    * O hook [`scripts/git-pre-commit-guard.sh`](./scripts/git-pre-commit-guard.sh) bloqueia localmente qualquer tentativa de commit de arquivos sensíveis, binários ou credenciais.
    * No GitHub Actions, a assinatura ocorre em memória efêmera com destruição imediata (`trap EXIT`) e permissões mínimas (`permissions: contents: read`).

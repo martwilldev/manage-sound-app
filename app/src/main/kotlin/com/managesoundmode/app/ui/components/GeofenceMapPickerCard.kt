@@ -6,6 +6,7 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -360,12 +361,19 @@ fun GeofenceMapPickerCard(
               settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
+                allowFileAccess = false
+                allowContentAccess = false
                 cacheMode = WebSettings.LOAD_DEFAULT
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                userAgentString = "ModosDeSomAndroid/0.2.0 (OpenStreetMap Geofence Picker)"
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                userAgentString = "ModosDeSomAndroid/0.3.1 (OpenStreetMap Geofence Picker)"
               }
               webChromeClient = WebChromeClient()
-              webViewClient = WebViewClient()
+              webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                  view: WebView?,
+                  request: WebResourceRequest?,
+                ): Boolean = true
+              }
               addJavascriptInterface(
                 OsmWebMapBridge(
                   onMapReadyCallback = {
@@ -613,8 +621,8 @@ private fun buildLeafletMapHtml(
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
       <style>
         html, body, #map {
           margin: 0;

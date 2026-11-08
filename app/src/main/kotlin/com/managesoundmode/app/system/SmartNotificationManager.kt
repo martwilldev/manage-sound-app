@@ -316,6 +316,7 @@ object SmartNotificationManager {
       action = SystemAutomationReceiver.ACTION_WIDGET_SET_MODE
       putExtra(SystemAutomationReceiver.EXTRA_SOUND_MODE, mode.name)
     }
+    InternalIntentSecurity.signIntent(context, intent)
     return PendingIntent.getBroadcast(
       context,
       requestCode,
@@ -333,6 +334,7 @@ object SmartNotificationManager {
       action = SystemAutomationReceiver.ACTION_NOTIFICATION_START_TIMER
       putExtra(SystemAutomationReceiver.EXTRA_DURATION_MINUTES, durationMinutes)
     }
+    InternalIntentSecurity.signIntent(context, intent)
     return PendingIntent.getBroadcast(
       context,
       requestCode,
@@ -349,6 +351,7 @@ object SmartNotificationManager {
       action = SystemAutomationReceiver.ACTION_NOTIFICATION_EXTEND_TIMER
       putExtra(SystemAutomationReceiver.EXTRA_DURATION_MINUTES, addMinutes)
     }
+    InternalIntentSecurity.signIntent(context, intent)
     return PendingIntent.getBroadcast(
       context,
       410,
@@ -361,6 +364,7 @@ object SmartNotificationManager {
     val intent = Intent(context, SystemAutomationReceiver::class.java).apply {
       action = SystemAutomationReceiver.ACTION_NOTIFICATION_RESTORE_NOW
     }
+    InternalIntentSecurity.signIntent(context, intent)
     return PendingIntent.getBroadcast(
       context,
       411,
@@ -373,6 +377,7 @@ object SmartNotificationManager {
     val intent = Intent(context, SystemAutomationReceiver::class.java).apply {
       action = SystemAutomationReceiver.ACTION_NOTIFICATION_REAPPLY_RULE
     }
+    InternalIntentSecurity.signIntent(context, intent)
     return PendingIntent.getBroadcast(
       context,
       412,

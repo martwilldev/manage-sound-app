@@ -560,19 +560,40 @@ class DataStoreSoundPreferencesDataSource(
       persistentQuickBarEnabled = current.persistentQuickBarEnabled,
       quickTileSlot1ProfileId = current.quickTileSlot1ProfileId,
       quickTileSlot2ProfileId = current.quickTileSlot2ProfileId,
-      accessControlConfig = current.accessControlConfig,
+      // Omite pinCode no arquivo exportado para evitar exposição de PIN em backups compartilhados
+      accessControlConfig = current.accessControlConfig.copy(pinCode = null),
       systemZenRulesEnabled = current.systemZenRulesEnabled,
     )
     return json.encodeToString(payload)
   }
 
   override suspend fun importBackupJson(rawJson: String) {
+    require(rawJson.length <= MAX_BACKUP_JSON_CHARS) { "Backup JSON excede o tamanho máximo permitido." }
     val payload = json.decodeFromString<SoundPrefsBackupPayload>(rawJson.trim())
+    val sanitizedLocations = payload.locationRules.take(MAX_IMPORTED_ITEMS).map { rule ->
+      rule.copy(
+        latitude = if (rule.latitude.isFinite()) rule.latitude.coerceIn(-90.0, 90.0) else 0.0,
+        longitude = if (rule.longitude.isFinite()) rule.longitude.coerceIn(-180.0, 180.0) else 0.0,
+        radiusMeters = rule.radiusMeters.coerceIn(50, 5000),
+      )
+    }
+    val sanitizedProfiles = payload.customProfiles.take(MAX_IMPORTED_ITEMS)
+    val sanitizedSchedules = payload.scheduleRules.take(MAX_IMPORTED_ITEMS)
+
     context.soundDataStore.edit { prefs ->
-      prefs[KEY_CUSTOM_PROFILES_JSON] = json.encodeToString(payload.customProfiles)
-      prefs[KEY_DELETED_PROFILE_IDS_JSON] = json.encodeToString(payload.deletedProfileIds)
-      prefs[KEY_SCHEDULE_RULES_JSON] = json.encodeToString(payload.scheduleRules)
-      prefs[KEY_LOCATION_RULES_JSON] = json.encodeToString(payload.locationRules)
+      val existingAccess = prefs[KEY_ACCESS_CONTROL_JSON]?.let { raw ->
+        runCatching { json.decodeFromString<AccessControlConfig>(raw) }.getOrNull()
+      }
+      val resolvedAccess = if (!existingAccess?.pinCode.isNullOrBlank() && payload.accessControlConfig.pinCode.isNullOrBlank()) {
+        payload.accessControlConfig.copy(pinCode = existingAccess.pinCode)
+      } else {
+        payload.accessControlConfig
+      }
+
+      prefs[KEY_CUSTOM_PROFILES_JSON] = json.encodeToString(sanitizedProfiles)
+      prefs[KEY_DELETED_PROFILE_IDS_JSON] = json.encodeToString(payload.deletedProfileIds.take(MAX_IMPORTED_ITEMS).toSet())
+      prefs[KEY_SCHEDULE_RULES_JSON] = json.encodeToString(sanitizedSchedules)
+      prefs[KEY_LOCATION_RULES_JSON] = json.encodeToString(sanitizedLocations)
       prefs[KEY_RESTORE_POLICY] = payload.restorePolicy.name
       prefs[KEY_DEFAULT_DAY_PROFILE_ID] = payload.defaultDayProfileId
       prefs[KEY_USE_DYNAMIC_COLOR] = payload.useDynamicColor
@@ -588,7 +609,7 @@ class DataStoreSoundPreferencesDataSource(
       prefs[KEY_PERSISTENT_QUICK_BAR] = payload.persistentQuickBarEnabled
       prefs[KEY_QUICK_TILE_SLOT1_PROFILE_ID] = payload.quickTileSlot1ProfileId
       prefs[KEY_QUICK_TILE_SLOT2_PROFILE_ID] = payload.quickTileSlot2ProfileId
-      prefs[KEY_ACCESS_CONTROL_JSON] = json.encodeToString(payload.accessControlConfig)
+      prefs[KEY_ACCESS_CONTROL_JSON] = json.encodeToString(resolvedAccess)
       prefs[KEY_SYSTEM_ZEN_RULES_ENABLED] = payload.systemZenRulesEnabled
     }
   }
@@ -596,6 +617,8 @@ class DataStoreSoundPreferencesDataSource(
   private companion object {
     const val TAG = "SoundPrefsDataSource"
     const val MAX_LOG_ENTRIES = 30
+    const val MAX_IMPORTED_ITEMS = 100
+    const val MAX_BACKUP_JSON_CHARS = 512_000
     val KEY_ACTIVE_PROFILE_ID = stringPreferencesKey("active_profile_id")
     val KEY_ACTIVE_TIMER_JSON = stringPreferencesKey("active_timer_json")
     val KEY_CUSTOM_PROFILES_JSON = stringPreferencesKey("custom_profiles_json")
