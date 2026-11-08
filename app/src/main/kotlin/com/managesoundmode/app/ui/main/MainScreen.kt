@@ -14,7 +14,10 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +29,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,8 +44,10 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
@@ -58,6 +64,7 @@ import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -70,8 +77,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -89,6 +94,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -97,6 +107,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -128,8 +139,12 @@ import com.managesoundmode.app.ui.components.ProfileEditorBottomSheet
 import com.managesoundmode.app.ui.components.ProminentLocationDisclosureDialog
 import com.managesoundmode.app.ui.components.modeIcon
 import com.managesoundmode.app.ui.components.profileIconForKey
+import com.managesoundmode.app.ui.theme.LocalZenithIsDark
 import com.managesoundmode.app.ui.theme.ManageSoundModeTheme
+import com.managesoundmode.app.ui.theme.onActivePillColor
 import com.managesoundmode.app.ui.theme.onTonalContainerColor
+import com.managesoundmode.app.ui.theme.orbGlowColor
+import com.managesoundmode.app.ui.theme.tonalAccentColor
 import com.managesoundmode.app.ui.theme.tonalContainerColor
 import com.managesoundmode.app.widget.SoundModeGlanceWidget
 
@@ -461,6 +476,9 @@ internal fun MainDashboardContent(
   var showGlobalPinChallengeDialog by rememberSaveable { mutableStateOf(false) }
   var pendingLocationPermissionAfterDisclosure by rememberSaveable { mutableStateOf(false) }
 
+  val isDark = LocalZenithIsDark.current
+  val modeAccent = state.currentMode.tonalAccentColor()
+
   val openAccessControlOrChallenge: () -> Unit = {
     if (state.accessControlConfig.isPinRequired && state.accessControlConfig.activeRole != AppAccessRole.ADMIN) {
       showGlobalPinChallengeDialog = true
@@ -469,15 +487,12 @@ internal fun MainDashboardContent(
     }
   }
 
-  // Estado unificado para o Editor Full-Screen de Perfil
   var editingProfile by remember { mutableStateOf<SoundProfile?>(null) }
   var showProfileBottomSheet by rememberSaveable { mutableStateOf(false) }
 
-  // Estado para o Editor Full-Screen de Horário
   var editingScheduleRule by remember { mutableStateOf<ScheduleRule?>(null) }
   var showScheduleBottomSheet by rememberSaveable { mutableStateOf(false) }
 
-  // Estado para o Editor Full-Screen de Local
   var editingLocationRule by remember { mutableStateOf<LocationRule?>(null) }
   var showLocationDisclosureDialog by rememberSaveable { mutableStateOf(false) }
   var showLocationBottomSheet by rememberSaveable { mutableStateOf(false) }
@@ -590,6 +605,9 @@ internal fun MainDashboardContent(
     LocationEditorBottomSheet(
       initialRule = editingLocationRule,
       profiles = state.profiles,
+      knownWifiSsids = state.locationRules
+        .mapNotNull { it.wifiSsid.trim().takeIf(String::isNotEmpty) }
+        .distinct(),
       onConfirm = { rule ->
         showLocationBottomSheet = false
         editingLocationRule = null
@@ -666,7 +684,7 @@ internal fun MainDashboardContent(
               Text(
                 text = AppLabels.Tabs.settingsTopBarTitle,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
               )
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -770,23 +788,44 @@ internal fun MainDashboardContent(
     topBar = {
       TopAppBar(
         title = {
-          Text(
-            text = selectedTab.topBarTitle,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold,
-          )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+          ) {
+            Box(
+              modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(modeAccent),
+            )
+            Text(
+              text = selectedTab.topBarTitle,
+              style = MaterialTheme.typography.headlineSmall,
+              fontWeight = FontWeight.Bold,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
         },
         actions = {
           if (state.accessControlConfig.isRestricted || state.accessControlConfig.isPinRequired) {
             Surface(
-              shape = RoundedCornerShape(14.dp),
+              shape = RoundedCornerShape(50),
               color = if (state.accessControlConfig.isRestricted) {
                 MaterialTheme.colorScheme.tertiaryContainer
               } else {
                 MaterialTheme.colorScheme.secondaryContainer
               },
+              border = BorderStroke(
+                width = 1.dp,
+                color = if (state.accessControlConfig.isRestricted) {
+                  MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
+                } else {
+                  MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f)
+                },
+              ),
               modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(50))
                 .clickable(onClick = openAccessControlOrChallenge)
                 .testTag(AppTestTags.TopBar.ROLE_BADGE_CHIP),
             ) {
@@ -807,6 +846,25 @@ internal fun MainDashboardContent(
                 )
               }
             }
+          }
+
+          // Alternador rápido Dark (Noite Boreal) / Light (Alvorada Nórdica)
+          IconButton(
+            onClick = {
+              val nextTheme = if (isDark) ThemeMode.LIGHT else ThemeMode.DARK
+              onSetThemeMode(nextTheme)
+            },
+            modifier = Modifier.testTag(AppTestTags.TopBar.QUICK_THEME_TOGGLE),
+          ) {
+            Icon(
+              imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+              contentDescription = if (isDark) {
+                AppLabels.TopBar.enableLightMode
+              } else {
+                AppLabels.TopBar.enableDarkMode
+              },
+              tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
           }
 
           Box {
@@ -1006,8 +1064,11 @@ internal fun MainDashboardContent(
                 showProfileBottomSheet = true
               }
             },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = modeAccent,
+            contentColor = state.currentMode.onActivePillColor(),
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text(AppLabels.Fab.newProfile) },
+            text = { Text(AppLabels.Fab.newProfile, fontWeight = FontWeight.Bold) },
             modifier = Modifier.testTag(AppTestTags.Fab.SAVE_PROFILE_BUTTON),
           )
         }
@@ -1023,8 +1084,11 @@ internal fun MainDashboardContent(
                 showScheduleBottomSheet = true
               }
             },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = modeAccent,
+            contentColor = state.currentMode.onActivePillColor(),
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text(AppLabels.Fab.newSchedule) },
+            text = { Text(AppLabels.Fab.newSchedule, fontWeight = FontWeight.Bold) },
             modifier = Modifier.testTag(AppTestTags.Fab.ADD_SCHEDULE_FAB),
           )
         }
@@ -1042,8 +1106,11 @@ internal fun MainDashboardContent(
                 showLocationBottomSheet = true
               }
             },
+            shape = RoundedCornerShape(22.dp),
+            containerColor = modeAccent,
+            contentColor = state.currentMode.onActivePillColor(),
             icon = { Icon(Icons.Default.Add, contentDescription = null) },
-            text = { Text(AppLabels.Fab.newLocation) },
+            text = { Text(AppLabels.Fab.newLocation, fontWeight = FontWeight.Bold) },
             modifier = Modifier.testTag(AppTestTags.Fab.ADD_LOCATION_FAB),
           )
         }
@@ -1051,30 +1118,11 @@ internal fun MainDashboardContent(
       }
     },
     bottomBar = {
-      NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-      ) {
-        MainAppTab.entries.forEach { tab ->
-          NavigationBarItem(
-            selected = selectedTab == tab,
-            onClick = { selectedTab = tab },
-            icon = {
-              Icon(
-                imageVector = tab.icon,
-                contentDescription = tab.label,
-              )
-            },
-            label = {
-              Text(
-                text = tab.label,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-            },
-            modifier = Modifier.testTag(tab.tag),
-          )
-        }
-      }
+      ZenithFloatingPillNavigationBar(
+        selectedTab = selectedTab,
+        activeAccent = modeAccent,
+        onSelectTab = { selectedTab = it },
+      )
     },
   ) { innerPadding ->
     when (selectedTab) {
@@ -1171,6 +1219,92 @@ internal fun MainDashboardContent(
   }
 }
 
+/**
+ * Barra de Navegação Inferior em Pílula Flutuante ZENITH (`Floating Glass Pill Dock`).
+ */
+@Composable
+private fun ZenithFloatingPillNavigationBar(
+  selectedTab: MainAppTab,
+  activeAccent: Color,
+  onSelectTab: (MainAppTab) -> Unit,
+) {
+  Box(
+    modifier = Modifier
+      .fillMaxWidth()
+      .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+      .padding(horizontal = 16.dp, vertical = 10.dp),
+    contentAlignment = Alignment.Center,
+  ) {
+    Surface(
+      shape = RoundedCornerShape(30.dp),
+      color = MaterialTheme.colorScheme.surfaceContainer,
+      border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+      modifier = Modifier.fillMaxWidth(),
+    ) {
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 6.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        MainAppTab.entries.forEach { tab ->
+          val selected = selectedTab == tab
+          val pillBg by animateColorAsState(
+            targetValue = if (selected) {
+              activeAccent.copy(alpha = 0.16f)
+            } else {
+              Color.Transparent
+            },
+            animationSpec = tween(180),
+            label = "zenithNavTabBg_${tab.name}",
+          )
+          val itemColor by animateColorAsState(
+            targetValue = if (selected) {
+              activeAccent
+            } else {
+              MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            animationSpec = tween(180),
+            label = "zenithNavTabContent_${tab.name}",
+          )
+
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(24.dp))
+              .background(pillBg)
+              .clickable { onSelectTab(tab) }
+              .padding(vertical = 8.dp, horizontal = 4.dp)
+              .testTag(tab.tag),
+            contentAlignment = Alignment.Center,
+          ) {
+            Column(
+              horizontalAlignment = Alignment.CenterHorizontally,
+              verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+              Icon(
+                imageVector = tab.icon,
+                contentDescription = tab.label,
+                tint = itemColor,
+                modifier = Modifier.size(20.dp),
+              )
+              Text(
+                text = tab.label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = itemColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 @Composable
 private fun NowTabContent(
   state: MainScreenUiState.Ready,
@@ -1191,7 +1325,7 @@ private fun NowTabContent(
     modifier = modifier
       .fillMaxSize()
       .testTag(AppTestTags.Now.LIST),
-    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
+    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     if (!state.hasDndPermission) {
@@ -1206,7 +1340,7 @@ private fun NowTabContent(
       }
     }
 
-    // Bloco 1: Hero Card Contextual (Com Chip compacto do Perfil Ativo + Timer Embutido Sob Demanda)
+    // Bloco 1: Orbe Acústico ZENITH + Pílula Tripla de Modo + Timer Embutido
     item {
       UnifiedHeroAndModeCard(
         currentMode = state.currentMode,
@@ -1236,16 +1370,20 @@ private fun NowTabContent(
       )
     }
 
-    // Bloco 2: Card Único Agrupado de Volumes (100% Zero Scroll no estado padrão)
+    // Bloco 2: 4 Cápsulas Líquidas de Volume ZENITH
     item {
       VolumeStreamsCard(
         streams = state.streams,
+        currentMode = state.currentMode,
         onStreamVolumeChange = onStreamVolumeChange,
       )
     }
   }
 }
 
+/**
+ * Orbe Acústico Respirante ZENITH (`ZenithOrbHeroCard`) + Seletor Triplo Flutuante + Gaveta de Timer.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun UnifiedHeroAndModeCard(
@@ -1261,25 +1399,35 @@ private fun UnifiedHeroAndModeCard(
   onExtendTimer: (Int) -> Unit,
   onCancelTimer: () -> Unit,
 ) {
+  val animatedAccent by animateColorAsState(
+    targetValue = currentMode.tonalAccentColor(),
+    animationSpec = tween(durationMillis = 280),
+    label = "zenithHeroAccent",
+  )
   val animatedContainer by animateColorAsState(
     targetValue = currentMode.tonalContainerColor(),
-    animationSpec = tween(durationMillis = 220),
-    label = "heroTonalContainer",
+    animationSpec = tween(durationMillis = 280),
+    label = "zenithHeroContainer",
   )
   val animatedOnContainer by animateColorAsState(
     targetValue = currentMode.onTonalContainerColor(),
-    animationSpec = tween(durationMillis = 220),
-    label = "heroOnTonalContainer",
+    animationSpec = tween(durationMillis = 280),
+    label = "zenithHeroOnContainer",
+  )
+  val animatedGlow by animateColorAsState(
+    targetValue = currentMode.orbGlowColor(),
+    animationSpec = tween(durationMillis = 280),
+    label = "zenithHeroGlow",
   )
 
-  // O Timer Contextual aparece SOMENTE quando o celular está em Vibrar/Silencioso ou quando há um timer rodando
   val showContextualTimerRow = currentMode != SoundMode.NORMAL || activeTimer != null
 
   Card(
     modifier = Modifier
       .fillMaxWidth()
       .testTag(AppTestTags.Now.HERO_MODE_CARD),
-    shape = RoundedCornerShape(28.dp),
+    shape = RoundedCornerShape(32.dp),
+    border = BorderStroke(1.dp, animatedAccent.copy(alpha = 0.28f)),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ),
@@ -1287,169 +1435,273 @@ private fun UnifiedHeroAndModeCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
+        .padding(18.dp),
+      verticalArrangement = Arrangement.spacedBy(14.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      // Cabeçalho Tonal Expressivo + Chip Compacto do Perfil Ativo à direita
+      // Linha Superior: Badge de Status Atmosférico + Chip de Cena/Perfil Ativo
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Surface(
+          shape = RoundedCornerShape(50),
+          color = animatedContainer,
+          border = BorderStroke(1.dp, animatedAccent.copy(alpha = 0.30f)),
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+          ) {
+            Box(
+              modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(animatedAccent),
+            )
+            Text(
+              text = activeRuleTitle ?: "ZENITH ACOUSTIC",
+              style = MaterialTheme.typography.labelSmall,
+              fontWeight = FontWeight.Bold,
+              color = animatedOnContainer,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Chip Compacto do Perfil Ativo (Tocar abre a aba Perfis)
+        Surface(
+          modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = onOpenProfilesTab)
+            .testTag(AppTestTags.Now.ACTIVE_PROFILE_CHIP),
+          shape = RoundedCornerShape(50),
+          color = MaterialTheme.colorScheme.surfaceContainerHigh,
+          border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+          ) {
+            Icon(
+              imageVector = activeProfile?.let { profileIconForKey(it.iconKey) } ?: Icons.Default.Style,
+              contentDescription = null,
+              tint = animatedAccent,
+              modifier = Modifier.size(15.dp),
+            )
+            Text(
+              text = activeProfile?.name ?: AppLabels.Tabs.profilesLabel,
+              style = MaterialTheme.typography.labelMedium,
+              fontWeight = FontWeight.SemiBold,
+              color = MaterialTheme.colorScheme.onSurface,
+              maxLines = 1,
+              softWrap = false,
+              overflow = TextOverflow.Ellipsis,
+            )
+            Icon(
+              imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.size(15.dp),
+            )
+          }
+        }
+      }
+
+      // Centro Gravitacional: Orbe Acústico ZENITH + Anéis Concêntricos
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(148.dp),
+        contentAlignment = Alignment.Center,
+      ) {
+        Canvas(modifier = Modifier.size(148.dp)) {
+          val center = Offset(size.width / 2f, size.height / 2f)
+          val maxR = size.minDimension / 2f
+
+          // Halo radial atmosférico
+          drawCircle(
+            brush = Brush.radialGradient(
+              colors = listOf(
+                animatedGlow.copy(alpha = 0.34f),
+                animatedGlow.copy(alpha = 0.10f),
+                Color.Transparent,
+              ),
+              center = center,
+              radius = maxR,
+            ),
+            radius = maxR,
+            center = center,
+          )
+
+          // Anel acústico externo tracejado
+          drawCircle(
+            color = animatedAccent.copy(alpha = 0.22f),
+            radius = maxR * 0.90f,
+            center = center,
+            style = Stroke(
+              width = 1.2.dp.toPx(),
+              pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+            ),
+          )
+
+          // Anel acústico intermediário
+          drawCircle(
+            color = animatedAccent.copy(alpha = 0.36f),
+            radius = maxR * 0.72f,
+            center = center,
+            style = Stroke(width = 1.5.dp.toPx()),
+          )
+
+          // Núcleo esférico do Orbe Zenith
+          drawCircle(
+            brush = Brush.radialGradient(
+              colors = listOf(
+                animatedAccent.copy(alpha = 0.42f),
+                animatedContainer,
+              ),
+              center = Offset(center.x - maxR * 0.14f, center.y - maxR * 0.14f),
+              radius = maxR * 0.56f,
+            ),
+            radius = maxR * 0.54f,
+            center = center,
+          )
+
+          drawCircle(
+            color = animatedAccent.copy(alpha = 0.75f),
+            radius = maxR * 0.54f,
+            center = center,
+            style = Stroke(width = 2.dp.toPx()),
+          )
+        }
+
+        // Ícone central dentro do Orbe (tocar alterna para o próximo modo)
+        Box(
+          modifier = Modifier
+            .size(78.dp)
+            .clip(CircleShape)
+            .clickable {
+              val modes = SoundMode.entries
+              val nextMode = modes[(modes.indexOf(currentMode) + 1) % modes.size]
+              onSelectMode(nextMode)
+            },
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(
+            imageVector = currentMode.modeIcon(),
+            contentDescription = null,
+            tint = animatedOnContainer,
+            modifier = Modifier.size(34.dp),
+          )
+        }
+      }
+
+      // Tipografia Central do Estado Acústico
+      Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+      ) {
+        Text(
+          text = currentMode.title,
+          style = MaterialTheme.typography.headlineSmall,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onSurface,
+          textAlign = TextAlign.Center,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        val cleanSubtitle = when {
+          currentMode != SoundMode.NORMAL ->
+            AppLabels.Now.modeWithMediaSubtitle(currentMode.subtitle, mediaPercent)
+          activeRuleSubtitle != null -> activeRuleSubtitle
+          else -> currentMode.subtitle
+        }
+        Text(
+          text = cleanSubtitle,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          textAlign = TextAlign.Center,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+
+      // Pílula Tripla Flutuante dos 3 Modos (Som | Vibrar | Silêncio)
       Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = animatedContainer,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
       ) {
         Row(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(5.dp),
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-          ) {
-            Box(
-              modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(animatedOnContainer.copy(alpha = 0.14f)),
-              contentAlignment = Alignment.Center,
-            ) {
-              Icon(
-                imageVector = currentMode.modeIcon(),
-                contentDescription = null,
-                tint = animatedOnContainer,
-                modifier = Modifier.size(24.dp),
-              )
-            }
+          SoundMode.entries.forEach { mode ->
+            val selected = mode == currentMode
+            val modeAccent = mode.tonalAccentColor()
+            val chipBg by animateColorAsState(
+              targetValue = if (selected) {
+                modeAccent
+              } else {
+                Color.Transparent
+              },
+              animationSpec = tween(180),
+              label = "zenithModePillBg_${mode.name}",
+            )
+            val chipContent by animateColorAsState(
+              targetValue = if (selected) {
+                mode.onActivePillColor()
+              } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+              },
+              animationSpec = tween(180),
+              label = "zenithModePillContent_${mode.name}",
+            )
 
-            Column(modifier = Modifier.weight(1f)) {
-              Text(
-                text = currentMode.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = animatedOnContainer,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-              val cleanSubtitle = when {
-                activeRuleTitle != null -> activeRuleTitle
-                currentMode != SoundMode.NORMAL ->
-                  AppLabels.Now.modeWithMediaSubtitle(currentMode.subtitle, mediaPercent)
-                else -> activeRuleSubtitle ?: currentMode.subtitle
+            Surface(
+              modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 44.dp)
+                .clip(RoundedCornerShape(19.dp))
+                .clickable { onSelectMode(mode) }
+                .semantics { contentDescription = AppLabels.Now.modeContentDescription(mode) }
+                .testTag(AppTestTags.Now.modeButton(mode)),
+              shape = RoundedCornerShape(19.dp),
+              color = chipBg,
+            ) {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 6.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
+                Icon(
+                  imageVector = mode.modeIcon(),
+                  contentDescription = null,
+                  tint = chipContent,
+                  modifier = Modifier.size(17.dp),
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                  text = AppLabels.Now.modeShortPill(mode),
+                  style = MaterialTheme.typography.labelLarge,
+                  fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                  color = chipContent,
+                  maxLines = 1,
+                  softWrap = false,
+                  overflow = TextOverflow.Ellipsis,
+                )
               }
-              Text(
-                text = cleanSubtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = animatedOnContainer.copy(alpha = 0.82f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.width(8.dp))
-
-          // Chip Compacto do Perfil Ativo (Tocar abre a aba Perfis)
-          Surface(
-            modifier = Modifier
-              .clip(RoundedCornerShape(14.dp))
-              .clickable(onClick = onOpenProfilesTab)
-              .testTag(AppTestTags.Now.ACTIVE_PROFILE_CHIP),
-            shape = RoundedCornerShape(14.dp),
-            color = animatedOnContainer.copy(alpha = 0.14f),
-          ) {
-            Row(
-              modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-              Icon(
-                imageVector = activeProfile?.let { profileIconForKey(it.iconKey) } ?: Icons.Default.Style,
-                contentDescription = null,
-                tint = animatedOnContainer,
-                modifier = Modifier.size(15.dp),
-              )
-              Text(
-                text = activeProfile?.name ?: AppLabels.Tabs.profilesLabel,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = animatedOnContainer,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-              )
-              Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = animatedOnContainer.copy(alpha = 0.8f),
-                modifier = Modifier.size(15.dp),
-              )
-            }
-          }
-        }
-      }
-
-      // Seletor Rápido dos 3 Modos (Pill Cards Tonais)
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        SoundMode.entries.forEach { mode ->
-          val selected = mode == currentMode
-          val chipBg by animateColorAsState(
-            targetValue = if (selected) {
-              MaterialTheme.colorScheme.primary
-            } else {
-              MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-            animationSpec = tween(180),
-            label = "modePillBg_${mode.name}",
-          )
-          val chipContent by animateColorAsState(
-            targetValue = if (selected) {
-              MaterialTheme.colorScheme.onPrimary
-            } else {
-              MaterialTheme.colorScheme.onSurface
-            },
-            animationSpec = tween(180),
-            label = "modePillContent_${mode.name}",
-          )
-
-          Surface(
-            modifier = Modifier
-              .weight(1f)
-              .heightIn(min = 48.dp)
-              .clip(RoundedCornerShape(18.dp))
-              .clickable { onSelectMode(mode) }
-              .semantics { contentDescription = AppLabels.Now.modeContentDescription(mode) }
-              .testTag(AppTestTags.Now.modeButton(mode)),
-            shape = RoundedCornerShape(18.dp),
-            color = chipBg,
-          ) {
-            Row(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 11.dp),
-              horizontalArrangement = Arrangement.Center,
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Icon(
-                imageVector = mode.modeIcon(),
-                contentDescription = null,
-                tint = chipContent,
-                modifier = Modifier.size(18.dp),
-              )
-              Spacer(modifier = Modifier.width(5.dp))
-              Text(
-                text = AppLabels.Now.modeShortPill(mode),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = chipContent,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-              )
             }
           }
         }
@@ -1463,7 +1715,7 @@ private fun UnifiedHeroAndModeCard(
       ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
           HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
           )
           FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -1478,7 +1730,7 @@ private fun UnifiedHeroAndModeCard(
               Icon(
                 imageVector = Icons.Default.AccessTime,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = animatedAccent,
                 modifier = Modifier.size(16.dp),
               )
               val remainingMinutes = activeTimer?.remainingMinutes(System.currentTimeMillis())
@@ -1507,12 +1759,13 @@ private fun UnifiedHeroAndModeCard(
                     .testTag(AppTestTags.Now.EXTEND_TIMER_BUTTON),
                   shape = RoundedCornerShape(50),
                   color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                  border = BorderStroke(1.dp, animatedAccent.copy(alpha = 0.35f)),
                 ) {
                   Text(
                     text = AppLabels.Now.extend30MinChip,
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    color = animatedAccent,
                     maxLines = 1,
                     softWrap = false,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
@@ -1526,6 +1779,7 @@ private fun UnifiedHeroAndModeCard(
                   Text(
                     text = AppLabels.Common.restore,
                     style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     softWrap = false,
                   )
@@ -1541,11 +1795,12 @@ private fun UnifiedHeroAndModeCard(
                       .testTag(AppTestTags.Now.timerChip(minutes)),
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                   ) {
                     Text(
                       text = label,
                       style = MaterialTheme.typography.labelMedium,
-                      fontWeight = FontWeight.Medium,
+                      fontWeight = FontWeight.SemiBold,
                       color = MaterialTheme.colorScheme.onSurface,
                       maxLines = 1,
                       softWrap = false,
@@ -1570,9 +1825,10 @@ private fun ManualOverrideBanner(
     modifier = Modifier
       .fillMaxWidth()
       .testTag(AppTestTags.Now.MANUAL_OVERRIDE_BANNER),
-    shape = RoundedCornerShape(22.dp),
+    shape = RoundedCornerShape(24.dp),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.40f)),
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.secondaryContainer,
+      containerColor = MaterialTheme.colorScheme.tertiaryContainer,
     ),
   ) {
     Row(
@@ -1586,17 +1842,18 @@ private fun ManualOverrideBanner(
         Text(
           text = AppLabels.Now.manualOverrideTitle,
           style = MaterialTheme.typography.titleSmall,
-          fontWeight = FontWeight.SemiBold,
-          color = MaterialTheme.colorScheme.onSecondaryContainer,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onTertiaryContainer,
         )
         Text(
           text = AppLabels.Now.manualOverrideSubtitle,
           style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+          color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f),
         )
       }
       FilledTonalButton(
         onClick = onReapplyActiveRule,
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier.testTag(AppTestTags.Now.REAPPLY_RULE_BUTTON),
       ) {
         Icon(
@@ -1605,7 +1862,7 @@ private fun ManualOverrideBanner(
           modifier = Modifier.size(16.dp),
         )
         Spacer(modifier = Modifier.width(6.dp))
-        Text(AppLabels.Now.reapplyButton)
+        Text(AppLabels.Now.reapplyButton, fontWeight = FontWeight.Bold)
       }
     }
   }
@@ -1619,7 +1876,8 @@ private fun DndPermissionBanner(
     modifier = Modifier
       .fillMaxWidth()
       .testTag(AppTestTags.Now.DND_PERMISSION_BANNER),
-    shape = RoundedCornerShape(22.dp),
+    shape = RoundedCornerShape(24.dp),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.errorContainer,
     ),
@@ -1645,7 +1903,7 @@ private fun DndPermissionBanner(
           Text(
             text = AppLabels.Now.dndBannerTitle,
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onErrorContainer,
           )
           Text(
@@ -1657,9 +1915,14 @@ private fun DndPermissionBanner(
       }
       Button(
         onClick = onRequestDndPermission,
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+          containerColor = MaterialTheme.colorScheme.error,
+          contentColor = MaterialTheme.colorScheme.onError,
+        ),
         modifier = Modifier.testTag(AppTestTags.Now.DND_ENABLE_BUTTON),
       ) {
-        Text(AppLabels.Common.enable)
+        Text(AppLabels.Common.enable, fontWeight = FontWeight.Bold)
       }
     }
   }
@@ -1668,11 +1931,15 @@ private fun DndPermissionBanner(
 @Composable
 private fun VolumeStreamsCard(
   streams: VolumeStreams,
+  currentMode: SoundMode,
   onStreamVolumeChange: (VolumeStreamType, Int) -> Unit,
 ) {
+  val activeAccent = currentMode.tonalAccentColor()
+
   Card(
     modifier = Modifier.fillMaxWidth(),
     shape = RoundedCornerShape(28.dp),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ),
@@ -1680,41 +1947,59 @@ private fun VolumeStreamsCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 18.dp, vertical = 14.dp),
-      verticalArrangement = Arrangement.spacedBy(4.dp),
+        .padding(horizontal = 16.dp, vertical = 16.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-      Text(
-        text = AppLabels.Now.volumesTitle,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(bottom = 2.dp),
-      )
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+          text = AppLabels.Now.volumesTitle,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+        )
+        Surface(
+          shape = RoundedCornerShape(50),
+          color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+          Text(
+            text = "4 CANAIS",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+          )
+        }
+      }
 
       PillVolumeSliderRow(
         type = VolumeStreamType.RING,
         icon = Icons.Default.RingVolume,
         percent = streams.ringPercent,
+        accentColor = activeAccent,
         onValueChangeFinished = { onStreamVolumeChange(VolumeStreamType.RING, it) },
       )
-      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
       PillVolumeSliderRow(
         type = VolumeStreamType.NOTIFICATION,
         icon = Icons.Default.Notifications,
         percent = streams.notificationPercent,
+        accentColor = activeAccent,
         onValueChangeFinished = { onStreamVolumeChange(VolumeStreamType.NOTIFICATION, it) },
       )
-      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
       PillVolumeSliderRow(
         type = VolumeStreamType.MEDIA,
         icon = Icons.Default.MusicNote,
         percent = streams.mediaPercent,
+        accentColor = activeAccent,
         onValueChangeFinished = { onStreamVolumeChange(VolumeStreamType.MEDIA, it) },
       )
-      HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
       PillVolumeSliderRow(
         type = VolumeStreamType.ALARM,
         icon = Icons.Default.Alarm,
         percent = streams.alarmPercent,
+        accentColor = activeAccent,
         onValueChangeFinished = { onStreamVolumeChange(VolumeStreamType.ALARM, it) },
       )
     }

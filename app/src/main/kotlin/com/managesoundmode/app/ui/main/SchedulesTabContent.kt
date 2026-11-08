@@ -1,5 +1,6 @@
 package com.managesoundmode.app.ui.main
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,13 +12,11 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -79,9 +78,10 @@ import com.managesoundmode.app.domain.model.Weekday
 import com.managesoundmode.app.ui.common.AppLabels
 import com.managesoundmode.app.ui.common.AppTestTags
 import com.managesoundmode.app.ui.components.M3CheckSwitch
-import com.managesoundmode.app.ui.components.groupedCardShape
 import com.managesoundmode.app.ui.components.profileIconForKey
+import com.managesoundmode.app.ui.theme.onActivePillColor
 import com.managesoundmode.app.ui.theme.onTonalContainerColor
+import com.managesoundmode.app.ui.theme.tonalAccentColor
 import com.managesoundmode.app.ui.theme.tonalContainerColor
 import java.util.Locale
 
@@ -101,8 +101,8 @@ internal fun SchedulesTabContent(
     modifier = modifier
       .fillMaxSize()
       .testTag(AppTestTags.Schedules.LIST),
-    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
-    verticalArrangement = Arrangement.spacedBy(3.dp),
+    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 104.dp),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     item {
       Text(
@@ -111,7 +111,7 @@ internal fun SchedulesTabContent(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
           .fillMaxWidth()
-          .padding(horizontal = 4.dp, vertical = 6.dp),
+          .padding(horizontal = 4.dp, vertical = 4.dp),
       )
     }
 
@@ -120,9 +120,10 @@ internal fun SchedulesTabContent(
         Card(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp)
+            .padding(bottom = 4.dp)
             .testTag(AppTestTags.Schedules.EXACT_ALARM_BANNER),
           shape = RoundedCornerShape(24.dp),
+          border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
           colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer,
           ),
@@ -154,7 +155,7 @@ internal fun SchedulesTabContent(
               onClick = onRequestExactAlarmPermission,
               modifier = Modifier.testTag(AppTestTags.Schedules.AUTHORIZE_EXACT_ALARM_BUTTON),
             ) {
-              Text(AppLabels.Common.authorize)
+              Text(AppLabels.Common.authorize, fontWeight = FontWeight.Bold)
             }
           }
         }
@@ -164,14 +165,14 @@ internal fun SchedulesTabContent(
     itemsIndexed(
       items = scheduleRules,
       key = { _, rule -> rule.id },
-    ) { index, rule ->
+    ) { _, rule ->
       val targetProfile = profiles.firstOrNull { it.id == rule.targetProfileId }
         ?: profiles.firstOrNull()
 
       GoogleClockScheduleCard(
         rule = rule,
         targetProfile = targetProfile,
-        shape = groupedCardShape(index = index, totalCount = scheduleRules.size),
+        shape = RoundedCornerShape(24.dp),
         onClick = { onEditRule(rule) },
         onToggleEnabled = { enabled -> onToggleRule(rule, enabled) },
         onDuplicate = { onDuplicateRule(rule) },
@@ -195,10 +196,16 @@ private fun GoogleClockScheduleCard(
   val haptics = LocalHapticFeedback.current
   var showContextMenu by remember { mutableStateOf(false) }
 
+  val modeAccent = targetProfile?.mode?.tonalAccentColor() ?: MaterialTheme.colorScheme.primary
   val containerColor = if (rule.enabled) {
-    MaterialTheme.colorScheme.surfaceContainerHigh
-  } else {
     MaterialTheme.colorScheme.surfaceContainerLow
+  } else {
+    MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.68f)
+  }
+  val borderStroke = if (rule.enabled) {
+    BorderStroke(1.dp, modeAccent.copy(alpha = 0.38f))
+  } else {
+    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
   }
 
   Card(
@@ -214,15 +221,16 @@ private fun GoogleClockScheduleCard(
       )
       .testTag(AppTestTags.Schedules.card(rule.id)),
     shape = shape,
+    border = borderStroke,
     colors = CardDefaults.cardColors(containerColor = containerColor),
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
         .padding(horizontal = 16.dp, vertical = 14.dp),
-      verticalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-      // Linha 1: Ícone + Nome da Rotina (largura flexível) + Menu (⋮)
+      // Linha 1: Avatar Circular + Nome da Rotina + Menu (⋮)
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -231,22 +239,36 @@ private fun GoogleClockScheduleCard(
         Row(
           modifier = Modifier.weight(1f),
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-          Icon(
-            imageVector = targetProfile?.let { profileIconForKey(it.iconKey) } ?: Icons.Default.AccessTime,
-            contentDescription = null,
-            tint = if (rule.enabled) {
-              MaterialTheme.colorScheme.primary
-            } else {
-              MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            modifier = Modifier.size(18.dp),
-          )
+          Box(
+            modifier = Modifier
+              .size(34.dp)
+              .clip(CircleShape)
+              .background(
+                if (rule.enabled) {
+                  modeAccent.copy(alpha = 0.16f)
+                } else {
+                  MaterialTheme.colorScheme.surfaceContainerHighest
+                },
+              ),
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(
+              imageVector = targetProfile?.let { profileIconForKey(it.iconKey) } ?: Icons.Default.AccessTime,
+              contentDescription = null,
+              tint = if (rule.enabled) {
+                modeAccent
+              } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+              },
+              modifier = Modifier.size(18.dp),
+            )
+          }
           Text(
             text = rule.name,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = if (rule.enabled) {
@@ -351,7 +373,7 @@ private fun GoogleClockScheduleCard(
         }
       }
 
-      // Linha 2: Horário Grande Estilo Google Clock + Switch M3 (adaptável a zoom aumentado)
+      // Linha 2: Horário Tabular ZENITH + Switch
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -360,7 +382,7 @@ private fun GoogleClockScheduleCard(
         Text(
           text = rule.formattedWindow(),
           style = MaterialTheme.typography.headlineMedium,
-          fontWeight = if (rule.enabled) FontWeight.SemiBold else FontWeight.Light,
+          fontWeight = if (rule.enabled) FontWeight.Bold else FontWeight.Light,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
           modifier = Modifier
@@ -380,7 +402,7 @@ private fun GoogleClockScheduleCard(
         )
       }
 
-      // Linha 3: Badges e Dias da Semana em FlowRow (zero truncamento ou esmagamento vertical)
+      // Linha 3: Badges Semânticos + Resumo dos Dias da Semana
       FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -394,10 +416,16 @@ private fun GoogleClockScheduleCard(
             } else {
               MaterialTheme.colorScheme.surfaceContainerHighest
             },
+            border = if (rule.enabled) {
+              BorderStroke(1.dp, modeAccent.copy(alpha = 0.30f))
+            } else {
+              null
+            },
           ) {
             Text(
               text = "${targetProfile.name} • ${targetProfile.mode.title}",
               style = MaterialTheme.typography.labelMedium,
+              fontWeight = FontWeight.SemiBold,
               maxLines = 1,
               softWrap = false,
               color = if (rule.enabled) {
@@ -428,6 +456,7 @@ private fun GoogleClockScheduleCard(
               Text(
                 text = AppLabels.Schedules.highPriorityBadge,
                 style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 softWrap = false,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -448,10 +477,7 @@ private fun GoogleClockScheduleCard(
 }
 
 /**
- * Tela dedicada Full-Screen para criar ou editar uma rotina de horário com `TimePicker` oficial do Material 3.
- * - Zero fechamento acidental.
- * - Salva automaticamente ao editar (initialRule != null).
- * - Apenas seleciona o perfil (não abre edição de perfil por dentro do horário).
+ * Tela dedicada Full-Screen ZENITH para criar ou editar uma rotina de horário.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -482,6 +508,9 @@ internal fun ScheduleEditorBottomSheet(
   var highPriority by rememberSaveable { mutableStateOf(initialRule?.highPriority ?: false) }
 
   var activeTimePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
+
+  val selectedProfile = profiles.firstOrNull { it.id == selectedProfileId } ?: profiles.firstOrNull()
+  val activeAccent = selectedProfile?.mode?.tonalAccentColor() ?: MaterialTheme.colorScheme.primary
 
   fun buildRule(): ScheduleRule {
     val resolvedName = name.trim().ifEmpty {
@@ -516,6 +545,7 @@ internal fun ScheduleEditorBottomSheet(
     )
     AlertDialog(
       onDismissRequest = { activeTimePickerTarget = null },
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
       title = {
         Text(
           if (isStart) {
@@ -523,6 +553,7 @@ internal fun ScheduleEditorBottomSheet(
           } else {
             AppLabels.Schedules.selectEndTimeTitle
           },
+          fontWeight = FontWeight.Bold,
         )
       },
       text = {
@@ -547,7 +578,7 @@ internal fun ScheduleEditorBottomSheet(
             notifyAutoSaveIfEditing()
           },
         ) {
-          Text(AppLabels.Common.ok)
+          Text(AppLabels.Common.ok, fontWeight = FontWeight.Bold)
         }
       },
       dismissButton = {
@@ -596,7 +627,7 @@ internal fun ScheduleEditorBottomSheet(
                   AppLabels.Schedules.newScheduleTitle
                 },
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
               )
@@ -604,7 +635,7 @@ internal fun ScheduleEditorBottomSheet(
                 Text(
                   text = AppLabels.Common.autoSavedSubtitle,
                   style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.primary,
+                  color = activeAccent,
                 )
               }
             }
@@ -644,7 +675,7 @@ internal fun ScheduleEditorBottomSheet(
           .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
-        // Cartões grandes de Início e Fim que abrem o TimePicker nativo do Android
+        // Cartões duplos ZENITH de Início e Fim
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -671,13 +702,13 @@ internal fun ScheduleEditorBottomSheet(
           },
           label = { Text(AppLabels.Schedules.scheduleNameLabel) },
           singleLine = true,
-          shape = RoundedCornerShape(16.dp),
+          shape = RoundedCornerShape(18.dp),
           modifier = Modifier
             .fillMaxWidth()
             .testTag(AppTestTags.Schedules.NAME_INPUT),
         )
 
-        // Dias da semana (7 círculos responsivos estilo Google Clock)
+        // Dias da semana (7 círculos responsivos ZENITH)
         Text(
           text = AppLabels.Schedules.daysOfWeekSectionTitle,
           style = MaterialTheme.typography.titleSmall,
@@ -692,11 +723,11 @@ internal fun ScheduleEditorBottomSheet(
             val selected = day in selectedDays
             Box(
               modifier = Modifier
-                .size(40.dp)
+                .size(42.dp)
                 .clip(CircleShape)
                 .background(
                   if (selected) {
-                    MaterialTheme.colorScheme.primary
+                    activeAccent
                   } else {
                     MaterialTheme.colorScheme.surfaceContainerHighest
                   },
@@ -719,7 +750,7 @@ internal fun ScheduleEditorBottomSheet(
                 maxLines = 1,
                 softWrap = false,
                 color = if (selected) {
-                  MaterialTheme.colorScheme.onPrimary
+                  selectedProfile?.mode?.onActivePillColor() ?: MaterialTheme.colorScheme.onPrimary
                 } else {
                   MaterialTheme.colorScheme.onSurfaceVariant
                 },
@@ -728,7 +759,7 @@ internal fun ScheduleEditorBottomSheet(
           }
         }
 
-        // Seleção exclusiva de Perfil (sem edição de perfil embutida)
+        // Seleção exclusiva de Cena/Perfil
         Text(
           text = AppLabels.Schedules.targetProfileSectionTitle,
           style = MaterialTheme.typography.titleSmall,
@@ -759,46 +790,53 @@ internal fun ScheduleEditorBottomSheet(
           }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween,
-          verticalAlignment = Alignment.CenterVertically,
+        Surface(
+          shape = RoundedCornerShape(22.dp),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-          Column(
+          Row(
             modifier = Modifier
-              .weight(1f)
-              .padding(end = 12.dp),
+              .fillMaxWidth()
+              .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
           ) {
-            Text(
-              text = AppLabels.Schedules.highPriorityTitle,
-              style = MaterialTheme.typography.bodyMedium,
-              fontWeight = FontWeight.Medium,
-            )
-            Text(
-              text = AppLabels.Schedules.highPrioritySubtitle,
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Column(
+              modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp),
+            ) {
+              Text(
+                text = AppLabels.Schedules.highPriorityTitle,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+              )
+              Text(
+                text = AppLabels.Schedules.highPrioritySubtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+            M3CheckSwitch(
+              checked = highPriority,
+              onCheckedChange = {
+                highPriority = it
+                notifyAutoSaveIfEditing()
+              },
             )
           }
-          M3CheckSwitch(
-            checked = highPriority,
-            onCheckedChange = {
-              highPriority = it
-              notifyAutoSaveIfEditing()
-            },
-          )
         }
 
         if (!isEditing) {
           Button(
             onClick = { onConfirm(buildRule()) },
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier
               .fillMaxWidth()
               .height(52.dp),
           ) {
-            Text(AppLabels.Schedules.createScheduleButton)
+            Text(AppLabels.Schedules.createScheduleButton, fontWeight = FontWeight.Bold)
           }
         }
       }
@@ -815,32 +853,34 @@ private fun TimeBoxCard(
 ) {
   Surface(
     modifier = modifier
-      .clip(RoundedCornerShape(20.dp))
+      .clip(RoundedCornerShape(24.dp))
       .clickable(onClick = onClick),
-    shape = RoundedCornerShape(20.dp),
-    color = MaterialTheme.colorScheme.secondaryContainer,
+    shape = RoundedCornerShape(24.dp),
+    color = MaterialTheme.colorScheme.surfaceContainerLow,
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(vertical = 14.dp, horizontal = 12.dp),
+        .padding(vertical = 16.dp, horizontal = 12.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(2.dp),
+      verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
       Text(
         text = label,
         style = MaterialTheme.typography.labelSmall,
-        maxLines = 1,
-        softWrap = false,
-        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
-      )
-      Text(
-        text = timeText,
-        style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
         softWrap = false,
-        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = MaterialTheme.colorScheme.primary,
+      )
+      Text(
+        text = timeText,
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        softWrap = false,
+        color = MaterialTheme.colorScheme.onSurface,
       )
     }
   }

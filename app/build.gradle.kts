@@ -13,6 +13,31 @@ val keystoreProps = Properties().apply {
   }
 }
 
+val versionPropsFile = rootProject.file("version.properties")
+val versionProps = Properties().apply {
+  if (versionPropsFile.exists()) {
+    versionPropsFile.inputStream().use { load(it) }
+  }
+}
+
+val propVersionCode = versionProps.getProperty("VERSION_CODE")?.toIntOrNull() ?: 3
+val envVersionCode =
+  (project.findProperty("versionCode") as? String)?.toIntOrNull()
+    ?: System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+
+val resolvedVersionCode: Int =
+  if (envVersionCode != null) maxOf(envVersionCode, propVersionCode) else propVersionCode
+
+val resolvedVersionName: String =
+  (project.findProperty("versionName") as? String)?.takeIf { it.isNotBlank() }
+    ?: System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() }
+    ?: run {
+      val major = versionProps.getProperty("VERSION_MAJOR") ?: "0"
+      val minor = versionProps.getProperty("VERSION_MINOR") ?: "3"
+      val patch = versionProps.getProperty("VERSION_PATCH") ?: "0"
+      "$major.$minor.$patch"
+    }
+
 android {
   namespace = "com.managesoundmode.app"
   compileSdk = 36
@@ -20,9 +45,9 @@ android {
   defaultConfig {
     applicationId = "com.managesoundmode.app"
     minSdk = 29
-    targetSdk = 35
-    versionCode = 2
-    versionName = "0.2.0"
+    targetSdk = 36
+    versionCode = resolvedVersionCode
+    versionName = resolvedVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -39,20 +64,21 @@ android {
           ?: System.getenv("RELEASE_STORE_FILE")
           ?: "keystore/manage-sound-release.jks"
       val keystoreFile = file(configuredStorePath)
-      if (keystoreFile.exists()) {
+      val resolvedStorePassword =
+        keystoreProps.getProperty("storePassword")
+          ?: System.getenv("RELEASE_STORE_PASSWORD")
+      val resolvedKeyAlias =
+        keystoreProps.getProperty("keyAlias")
+          ?: System.getenv("RELEASE_KEY_ALIAS")
+      val resolvedKeyPassword =
+        keystoreProps.getProperty("keyPassword")
+          ?: System.getenv("RELEASE_KEY_PASSWORD")
+
+      if (keystoreFile.exists() && !resolvedStorePassword.isNullOrBlank() && !resolvedKeyAlias.isNullOrBlank() && !resolvedKeyPassword.isNullOrBlank()) {
         storeFile = keystoreFile
-        storePassword =
-          keystoreProps.getProperty("storePassword")
-            ?: System.getenv("RELEASE_STORE_PASSWORD")
-            ?: "change_me_in_production"
-        keyAlias =
-          keystoreProps.getProperty("keyAlias")
-            ?: System.getenv("RELEASE_KEY_ALIAS")
-            ?: "managesoundmode"
-        keyPassword =
-          keystoreProps.getProperty("keyPassword")
-            ?: System.getenv("RELEASE_KEY_PASSWORD")
-            ?: "change_me_in_production"
+        storePassword = resolvedStorePassword
+        keyAlias = resolvedKeyAlias
+        keyPassword = resolvedKeyPassword
       } else {
         initWith(getByName("debug"))
       }
@@ -68,6 +94,9 @@ android {
       isShrinkResources = true
       signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      ndk {
+        debugSymbolLevel = "SYMBOL_TABLE"
+      }
     }
   }
 

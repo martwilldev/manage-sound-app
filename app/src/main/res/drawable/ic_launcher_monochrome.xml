@@ -5,26 +5,26 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Silhueta Monocromática Pura para Ícones Temáticos do Android 13–16 (Material You / Monet) -->
+    <!-- Silhueta Monocromática Floating Capsules (Android 13–16 Themed Icons) -->
+    <!-- Trilhos sutis -->
+    <path
+        android:fillColor="#38FFFFFF"
+        android:pathData="M33,27C36.866,27 40,30.134 40,34V74C40,77.866 36.866,81 33,81C29.134,81 26,77.866 26,74V34C26,30.134 29.134,27 33,27Z" />
+    <path
+        android:fillColor="#38FFFFFF"
+        android:pathData="M54,23C57.866,23 61,26.134 61,30V78C61,81.866 57.866,85 54,85C50.134,85 47,81.866 47,78V30C47,26.134 50.134,23 54,23Z" />
+    <path
+        android:fillColor="#38FFFFFF"
+        android:pathData="M75,27C78.866,27 82,30.134 82,34V74C82,77.866 78.866,81 75,81C71.134,81 68,77.866 68,74V34C68,30.134 71.134,27 75,27Z" />
+
+    <!-- Preenchimento das 3 Cápsulas -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M34,47C34,45.343 35.343,44 37,44H42.6L52.2,35.9C53.8,34.55 56.25,35.69 56.25,37.78V68.22C56.25,70.31 53.8,71.45 52.2,70.1L42.6,62H37C35.343,62 34,60.657 34,59V47Z" />
-
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M62.5,44.5C65.8,47.0 67.8,50.3 67.8,53C67.8,55.7 65.8,59.0 62.5,61.5"
-        android:strokeWidth="4.4"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
-
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M68.2,38.5C73.6,42.5 76.8,47.5 76.8,53C76.8,58.5 73.6,63.5 68.2,67.5"
-        android:strokeWidth="4.2"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
-
+        android:pathData="M33,44C36.866,44 40,47.134 40,51V74C40,77.866 36.866,81 33,81C29.134,81 26,77.866 26,74V51C26,47.134 29.134,44 33,44Z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M63.5,35.5m-3.2,0a3.2,3.2 0,1 1,6.4 0a3.2,3.2 0,1 1,-6.4 0" />
+        android:pathData="M54,29C57.866,29 61,32.134 61,36V78C61,81.866 57.866,85 54,85C50.134,85 47,81.866 47,78V36C47,32.134 50.134,29 54,29Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M75,52C78.866,52 82,55.134 82,59V74C82,77.866 78.866,81 75,81C71.134,81 68,77.866 68,74V59C68,55.134 71.134,52 75,52Z" />
 </vector>

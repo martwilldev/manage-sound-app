@@ -2,6 +2,7 @@ package com.managesoundmode.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -286,21 +287,29 @@ private fun OnboardingStep1WelcomeContent(
     .getOrDefault(AppLabels.currentLanguage)
 
   Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-    // Hero Banner de Boas-vindas
+    // Hero Banner de Boas-vindas Zenith
     Card(
       modifier = Modifier.fillMaxWidth(),
       shape = RoundedCornerShape(28.dp),
       colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+      ),
+      border = BorderStroke(
+        width = 1.dp,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.42f),
       ),
     ) {
       Column(
-        modifier = Modifier.padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.padding(22.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         Surface(
           shape = RoundedCornerShape(50),
-          color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+          color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+          border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+          ),
         ) {
           Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -310,14 +319,14 @@ private fun OnboardingStep1WelcomeContent(
             Icon(
               imageVector = Icons.AutoMirrored.Filled.VolumeUp,
               contentDescription = null,
-              tint = MaterialTheme.colorScheme.onPrimaryContainer,
+              tint = MaterialTheme.colorScheme.primary,
               modifier = Modifier.size(16.dp),
             )
             Text(
               text = AppLabels.Onboarding.step1Badge,
               style = MaterialTheme.typography.labelMedium,
               fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.onPrimaryContainer,
+              color = MaterialTheme.colorScheme.primary,
             )
           }
         }
@@ -326,13 +335,13 @@ private fun OnboardingStep1WelcomeContent(
           text = AppLabels.Onboarding.step1Title,
           style = MaterialTheme.typography.headlineSmall,
           fontWeight = FontWeight.Bold,
-          color = MaterialTheme.colorScheme.onPrimaryContainer,
+          color = MaterialTheme.colorScheme.onSurface,
         )
 
         Text(
           text = AppLabels.Onboarding.step1Subtitle,
           style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
     }

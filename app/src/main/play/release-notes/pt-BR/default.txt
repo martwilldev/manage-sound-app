@@ -1,0 +1,4 @@
+• Novo visual Zenith com Orbe de status e troca rápida entre Som, Vibrar e Silêncio.
+• Timer de auto-restauração (15m, 30m, 1h, 2h) com retorno automático ao perfil padrão.
+• Seletor inteligente de redes Wi-Fi conhecidas e filtro de busca em Locais (Geofence).
+• Suporte ao Android 16 (API 36), temas Noite/Alvorada e melhorias de estabilidade.

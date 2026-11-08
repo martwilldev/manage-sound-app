@@ -3,6 +3,7 @@ package com.managesoundmode.app.ui.main
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -277,15 +278,15 @@ internal fun SettingsAndProfilesTabContent(
       .fillMaxSize()
       .testTag(AppTestTags.Settings.LIST),
     contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 36.dp),
-    verticalArrangement = Arrangement.spacedBy(3.dp),
+    verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    // 0. Card de Topo — Chave Geral de Automação (Modo Férias)
+    // 0. Card de Topo — Chave Geral de Automação (Modo Férias Zenith)
     item {
       MasterAutomationBannerCard(
         automationsPaused = state.automationsPaused,
         onToggleAutomationsPaused = { enabled -> onSetAutomationsPaused(!enabled) },
       )
-      Spacer(modifier = Modifier.height(14.dp))
+      Spacer(modifier = Modifier.height(10.dp))
     }
 
     // Grupo 1: Preferências e Comportamento (4 Categorias)
@@ -302,7 +303,7 @@ internal fun SettingsAndProfilesTabContent(
           languageLabel = AppLabels.currentLanguage.shortLabel,
           dynamicColor = state.useDynamicColor,
         ),
-        shape = groupedCardShape(index = 0, totalCount = 4),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_APPEARANCE,
         onClick = { openCategory = SettingsCategory.APPEARANCE },
       )
@@ -317,7 +318,7 @@ internal fun SettingsAndProfilesTabContent(
           defaultProfileName = defaultProfile?.name ?: "-",
           paused = state.automationsPaused,
         ),
-        shape = groupedCardShape(index = 1, totalCount = 4),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_AUTOMATION,
         onClick = { openCategory = SettingsCategory.AUTOMATION },
       )
@@ -332,7 +333,7 @@ internal fun SettingsAndProfilesTabContent(
           preserveBt = state.preserveMediaOnBluetooth,
           defaultTimerMinutes = state.defaultTimerMinutes,
         ),
-        shape = groupedCardShape(index = 2, totalCount = 4),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_AUDIO_MEDIA,
         onClick = { openCategory = SettingsCategory.AUDIO_MEDIA },
       )
@@ -347,7 +348,7 @@ internal fun SettingsAndProfilesTabContent(
           slot1Name = slot1Profile?.name ?: "-",
           slot2Name = slot2Profile?.name ?: "-",
         ),
-        shape = groupedCardShape(index = 3, totalCount = 4),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_GADGETS_WIDGETS,
         onClick = { openCategory = SettingsCategory.GADGETS_WIDGETS },
       )
@@ -355,7 +356,7 @@ internal fun SettingsAndProfilesTabContent(
 
     // Grupo 2: Sistema, Dados e Informações (5 Categorias)
     item {
-      Spacer(modifier = Modifier.height(14.dp))
+      Spacer(modifier = Modifier.height(10.dp))
       SectionHeader(title = AppLabels.Settings.hubSystemGroupTitle)
     }
 
@@ -367,7 +368,7 @@ internal fun SettingsAndProfilesTabContent(
           grantedCount = grantedPermissionsCount,
           totalCount = 4,
         ),
-        shape = groupedCardShape(index = 0, totalCount = 5),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_PERMISSIONS,
         hasWarningBadge = grantedPermissionsCount < 4,
         onClick = { openCategory = SettingsCategory.PERMISSIONS },
@@ -389,7 +390,7 @@ internal fun SettingsAndProfilesTabContent(
           totalCount = AppPermission.entries.size,
           hasPin = state.accessControlConfig.isPinRequired,
         ),
-        shape = groupedCardShape(index = 1, totalCount = 5),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_ACCESS_CONTROL,
         hasWarningBadge = state.accessControlConfig.isRestricted,
         onClick = {
@@ -407,7 +408,7 @@ internal fun SettingsAndProfilesTabContent(
         icon = Icons.Default.History,
         title = AppLabels.Settings.categoryHistoryTitle,
         subtitle = AppLabels.Settings.historySummary(state.transitionLogs.size),
-        shape = groupedCardShape(index = 2, totalCount = 5),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_HISTORY,
         onClick = { openCategory = SettingsCategory.HISTORY },
       )
@@ -422,7 +423,7 @@ internal fun SettingsAndProfilesTabContent(
           schedulesCount = state.scheduleRules.size,
           locationsCount = state.locationRules.size,
         ),
-        shape = groupedCardShape(index = 3, totalCount = 5),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_BACKUP_RESET,
         onClick = { openCategory = SettingsCategory.BACKUP_RESET },
       )
@@ -433,7 +434,7 @@ internal fun SettingsAndProfilesTabContent(
         icon = Icons.Default.Info,
         title = AppLabels.Settings.categoryAboutTitle,
         subtitle = AppLabels.Settings.aboutVersionSubtitle,
-        shape = groupedCardShape(index = 4, totalCount = 5),
+        shape = RoundedCornerShape(22.dp),
         testTag = AppTestTags.Settings.CATEGORY_ABOUT,
         onClick = { openCategory = SettingsCategory.ABOUT },
       )
@@ -490,15 +491,15 @@ private fun MasterAutomationBannerCard(
   onToggleAutomationsPaused: (Boolean) -> Unit,
 ) {
   val isAutomationEnabled = !automationsPaused
-  val containerColor = if (isAutomationEnabled) {
-    MaterialTheme.colorScheme.secondaryContainer
+  val accentColor = if (isAutomationEnabled) {
+    MaterialTheme.colorScheme.primary
   } else {
-    MaterialTheme.colorScheme.tertiaryContainer
+    MaterialTheme.colorScheme.secondary
   }
-  val contentColor = if (isAutomationEnabled) {
-    MaterialTheme.colorScheme.onSecondaryContainer
+  val containerColor = if (isAutomationEnabled) {
+    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
   } else {
-    MaterialTheme.colorScheme.onTertiaryContainer
+    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
   }
 
   Card(
@@ -507,6 +508,10 @@ private fun MasterAutomationBannerCard(
       .testTag(AppTestTags.Settings.MASTER_AUTOMATION_CARD),
     shape = RoundedCornerShape(26.dp),
     colors = CardDefaults.cardColors(containerColor = containerColor),
+    border = BorderStroke(
+      width = 1.dp,
+      color = accentColor.copy(alpha = 0.35f),
+    ),
   ) {
     Row(
       modifier = Modifier
@@ -522,22 +527,30 @@ private fun MasterAutomationBannerCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
       ) {
-        Icon(
-          imageVector = if (isAutomationEnabled) {
-            Icons.Default.PlayCircleFilled
-          } else {
-            Icons.Default.PauseCircleFilled
-          },
-          contentDescription = null,
-          tint = contentColor,
-          modifier = Modifier.size(30.dp),
-        )
+        Box(
+          modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(accentColor.copy(alpha = 0.16f)),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(
+            imageVector = if (isAutomationEnabled) {
+              Icons.Default.PlayCircleFilled
+            } else {
+              Icons.Default.PauseCircleFilled
+            },
+            contentDescription = null,
+            tint = accentColor,
+            modifier = Modifier.size(26.dp),
+          )
+        }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
           Text(
             text = AppLabels.Settings.masterAutomationTitle,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = contentColor,
+            color = MaterialTheme.colorScheme.onSurface,
           )
           Text(
             text = if (isAutomationEnabled) {
@@ -546,7 +559,7 @@ private fun MasterAutomationBannerCard(
               AppLabels.Settings.masterAutomationPausedSubtitle
             },
             style = MaterialTheme.typography.bodySmall,
-            color = contentColor.copy(alpha = 0.85f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
       }
@@ -579,6 +592,14 @@ private fun SettingsCategoryRowCard(
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ),
+    border = BorderStroke(
+      width = 1.dp,
+      color = if (hasWarningBadge) {
+        MaterialTheme.colorScheme.secondary.copy(alpha = 0.45f)
+      } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+      },
+    ),
   ) {
     Row(
       modifier = Modifier
@@ -590,14 +611,14 @@ private fun SettingsCategoryRowCard(
       Box(
         modifier = Modifier
           .size(42.dp)
-          .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.secondaryContainer),
+          .clip(RoundedCornerShape(14.dp))
+          .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
           imageVector = icon,
           contentDescription = null,
-          tint = MaterialTheme.colorScheme.onSecondaryContainer,
+          tint = MaterialTheme.colorScheme.primary,
           modifier = Modifier.size(21.dp),
         )
       }
@@ -627,7 +648,7 @@ private fun SettingsCategoryRowCard(
         Icon(
           imageVector = Icons.Default.WarningAmber,
           contentDescription = null,
-          tint = MaterialTheme.colorScheme.error,
+          tint = MaterialTheme.colorScheme.secondary,
           modifier = Modifier.size(20.dp),
         )
       }

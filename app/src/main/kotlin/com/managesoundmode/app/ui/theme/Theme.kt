@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -16,64 +17,68 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.managesoundmode.app.domain.model.ThemeMode
 
-private val PixelExpressiveDarkScheme = darkColorScheme(
-  primary = Color(0xFFA8C7FA),
-  onPrimary = Color(0xFF062E6F),
-  primaryContainer = Color(0xFF1B3A6B),
-  onPrimaryContainer = Color(0xFFD6E3FF),
-  secondary = Color(0xFFBEC6DC),
-  onSecondary = Color(0xFF283041),
-  secondaryContainer = Color(0xFF343D52),
-  onSecondaryContainer = Color(0xFFDAE2F9),
-  tertiary = Color(0xFFE5B8E8),
-  onTertiary = Color(0xFF44244A),
-  tertiaryContainer = Color(0xFF533359),
-  onTertiaryContainer = Color(0xFFFAD7FF),
-  error = Color(0xFFFFB4AB),
-  errorContainer = Color(0xFF93000A),
-  onErrorContainer = Color(0xFFFFDAD6),
-  background = Color(0xFF0E131A),
-  onBackground = Color(0xFFE2E2E9),
-  surface = Color(0xFF0E131A),
-  onSurface = Color(0xFFE2E2E9),
-  surfaceVariant = Color(0xFF44474E),
-  onSurfaceVariant = Color(0xFFC4C6D0),
-  surfaceContainerLowest = Color(0xFF090E14),
-  surfaceContainerLow = Color(0xFF161B22),
-  surfaceContainer = Color(0xFF1A2028),
-  surfaceContainerHigh = Color(0xFF252A33),
-  surfaceContainerHighest = Color(0xFF30353E),
-  outline = Color(0xFF8E9099),
+private val ZenithBorealDarkScheme = darkColorScheme(
+  primary = ZenithNormalTealDark,
+  onPrimary = Color(0xFF042F2E),
+  primaryContainer = ZenithNormalContainerDark,
+  onPrimaryContainer = ZenithNormalOnContainerDark,
+  secondary = ZenithSilentVioletDark,
+  onSecondary = Color(0xFF1E1B4B),
+  secondaryContainer = ZenithSilentContainerDark,
+  onSecondaryContainer = ZenithSilentOnContainerDark,
+  tertiary = ZenithVibrateAmberDark,
+  onTertiary = Color(0xFF451A03),
+  tertiaryContainer = ZenithVibrateContainerDark,
+  onTertiaryContainer = ZenithVibrateOnContainerDark,
+  error = Color(0xFFF87171),
+  onError = Color(0xFF450A0A),
+  errorContainer = Color(0xFF3B1219),
+  onErrorContainer = Color(0xFFFECACA),
+  background = ZenithBorealBg,
+  onBackground = ZenithBorealTextPrimary,
+  surface = ZenithBorealBg,
+  onSurface = ZenithBorealTextPrimary,
+  surfaceVariant = ZenithBorealElevated,
+  onSurfaceVariant = ZenithBorealTextSecondary,
+  surfaceContainerLowest = ZenithBorealBg,
+  surfaceContainerLow = ZenithBorealCard,
+  surfaceContainer = ZenithBorealNav,
+  surfaceContainerHigh = ZenithBorealElevated,
+  surfaceContainerHighest = ZenithBorealPillInactive,
+  outline = Color(0xFF334155),
+  outlineVariant = ZenithBorealBorder,
 )
 
-private val PixelExpressiveLightScheme = lightColorScheme(
-  primary = Color(0xFF1B5E91),
+private val ZenithNordicLightScheme = lightColorScheme(
+  primary = ZenithNormalTealLight,
   onPrimary = Color.White,
-  primaryContainer = Color(0xFFD6E3FF),
-  onPrimaryContainer = Color(0xFF001B3E),
-  secondary = Color(0xFF565E71),
+  primaryContainer = ZenithNormalContainerLight,
+  onPrimaryContainer = ZenithNormalOnContainerLight,
+  secondary = ZenithSilentVioletLight,
   onSecondary = Color.White,
-  secondaryContainer = Color(0xFFDAE2F9),
-  onSecondaryContainer = Color(0xFF131C2B),
-  tertiary = Color(0xFF705575),
+  secondaryContainer = ZenithSilentContainerLight,
+  onSecondaryContainer = ZenithSilentOnContainerLight,
+  tertiary = ZenithVibrateAmberLight,
   onTertiary = Color.White,
-  tertiaryContainer = Color(0xFFFAD8FD),
-  onTertiaryContainer = Color(0xFF28132E),
-  error = Color(0xFFBA1A1A),
-  errorContainer = Color(0xFFFFDAD6),
-  onErrorContainer = Color(0xFF410002),
-  background = Color(0xFFF7F9FF),
-  onBackground = Color(0xFF191C20),
-  surface = Color(0xFFF7F9FF),
-  onSurface = Color(0xFF191C20),
-  surfaceVariant = Color(0xFFE0E2EC),
-  onSurfaceVariant = Color(0xFF44474E),
-  surfaceContainerLowest = Color(0xFFFFFFFF),
-  surfaceContainerLow = Color(0xFFF1F4FA),
-  surfaceContainer = Color(0xFFEBEEF4),
-  surfaceContainerHigh = Color(0xFFE6E8EE),
-  surfaceContainerHighest = Color(0xFFE0E2E9),
-  outline = Color(0xFF74777F),
+  tertiaryContainer = ZenithVibrateContainerLight,
+  onTertiaryContainer = ZenithVibrateOnContainerLight,
+  error = Color(0xFFDC2626),
+  onError = Color.White,
+  errorContainer = Color(0xFFFEE2E2),
+  onErrorContainer = Color(0xFF7F1D1D),
+  background = ZenithNordicBg,
+  onBackground = ZenithNordicTextPrimary,
+  surface = ZenithNordicBg,
+  onSurface = ZenithNordicTextPrimary,
+  surfaceVariant = ZenithNordicElevated,
+  onSurfaceVariant = ZenithNordicTextSecondary,
+  surfaceContainerLowest = ZenithNordicBg,
+  surfaceContainerLow = ZenithNordicCard,
+  surfaceContainer = ZenithNordicNav,
+  surfaceContainerHigh = ZenithNordicElevated,
+  surfaceContainerHighest = ZenithNordicPillInactive,
+  outline = Color(0xFFCBD5E1),
+  outlineVariant = ZenithNordicBorder,
 )
 
 @Composable
@@ -90,12 +95,17 @@ fun ManageSoundModeTheme(
   }
 
   val context = LocalContext.current
-  val colorScheme = when {
-    dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-      if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    }
-    isDark -> PixelExpressiveDarkScheme
-    else -> PixelExpressiveLightScheme
+  val baseZenithScheme = if (isDark) ZenithBorealDarkScheme else ZenithNordicLightScheme
+
+  // Mantém a identidade atmosférica ZENITH ("Noite Boreal" / "Alvorada Nórdica") mesmo quando
+  // Dynamic Color está ativo, ancorando todas as superfícies e acentos semânticos do Orbe.
+  val colorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val dynamic = if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    baseZenithScheme.copy(
+      inversePrimary = dynamic.inversePrimary,
+    )
+  } else {
+    baseZenithScheme
   }
 
   val view = LocalView.current
@@ -108,9 +118,11 @@ fun ManageSoundModeTheme(
     }
   }
 
-  MaterialTheme(
-    colorScheme = colorScheme,
-    typography = Typography,
-    content = content,
-  )
+  CompositionLocalProvider(LocalZenithIsDark provides isDark) {
+    MaterialTheme(
+      colorScheme = colorScheme,
+      typography = Typography,
+      content = content,
+    )
+  }
 }

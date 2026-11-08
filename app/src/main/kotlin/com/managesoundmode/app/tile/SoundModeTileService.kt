@@ -109,6 +109,7 @@ abstract class BaseSoundTileService : TileService() {
     }
   }
 
+  @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
   protected fun openDndPermissionSettings() {
     val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

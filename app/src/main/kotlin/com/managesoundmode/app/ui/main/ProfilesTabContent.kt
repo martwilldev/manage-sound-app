@@ -1,5 +1,6 @@
 package com.managesoundmode.app.ui.main
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -10,10 +11,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,7 +29,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,9 +52,10 @@ import androidx.compose.ui.unit.dp
 import com.managesoundmode.app.domain.model.SoundProfile
 import com.managesoundmode.app.ui.common.AppLabels
 import com.managesoundmode.app.ui.common.AppTestTags
-import com.managesoundmode.app.ui.components.groupedCardShape
 import com.managesoundmode.app.ui.components.profileIconForKey
+import com.managesoundmode.app.ui.theme.onActivePillColor
 import com.managesoundmode.app.ui.theme.onTonalContainerColor
+import com.managesoundmode.app.ui.theme.tonalAccentColor
 import com.managesoundmode.app.ui.theme.tonalContainerColor
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -76,8 +75,8 @@ fun ProfilesTabContent(
     modifier = modifier
       .fillMaxSize()
       .testTag(AppTestTags.Profiles.LIST),
-    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
-    verticalArrangement = Arrangement.spacedBy(3.dp),
+    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 104.dp),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     item {
       Text(
@@ -86,14 +85,14 @@ fun ProfilesTabContent(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
           .fillMaxWidth()
-          .padding(horizontal = 4.dp, vertical = 6.dp),
+          .padding(horizontal = 4.dp, vertical = 4.dp),
       )
     }
 
     itemsIndexed(
       items = state.profiles,
       key = { _, profile -> profile.id },
-    ) { index, profile ->
+    ) { _, profile ->
       val isActive = state.activeProfileId == profile.id
       val isDefaultRestore = state.defaultDayProfileId == profile.id
       ProfileGroupedCard(
@@ -101,7 +100,7 @@ fun ProfilesTabContent(
         isActive = isActive,
         isDefaultRestore = isDefaultRestore,
         canDelete = canDeleteProfiles,
-        shape = groupedCardShape(index = index, totalCount = state.profiles.size),
+        shape = RoundedCornerShape(24.dp),
         onActivate = { onActivateProfile(profile) },
         onEdit = { onEditProfile(profile) },
         onDuplicate = { onDuplicateProfile(profile) },
@@ -129,10 +128,16 @@ private fun ProfileGroupedCard(
   val haptics = LocalHapticFeedback.current
   var showContextMenu by remember { mutableStateOf(false) }
 
+  val modeAccent = profile.mode.tonalAccentColor()
   val containerColor = if (isActive) {
-    MaterialTheme.colorScheme.secondaryContainer
+    MaterialTheme.colorScheme.surfaceContainerHigh
   } else {
     MaterialTheme.colorScheme.surfaceContainerLow
+  }
+  val borderStroke = if (isActive) {
+    BorderStroke(1.5.dp, modeAccent.copy(alpha = 0.65f))
+  } else {
+    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
   }
 
   Box(modifier = Modifier.fillMaxWidth()) {
@@ -149,15 +154,16 @@ private fun ProfileGroupedCard(
         )
         .testTag(AppTestTags.Profiles.card(profile.id)),
       shape = shape,
+      border = borderStroke,
       colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
       Column(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+          .padding(horizontal = 16.dp, vertical = 15.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
-        // Linha 1: Ícone + Nome e Descrição com largura livre + Menu (⋮)
+        // Linha 1: Avatar Circular com Halo Semântico + Nome e Descrição + Menu (⋮)
         Row(
           modifier = Modifier.fillMaxWidth(),
           verticalAlignment = Alignment.CenterVertically,
@@ -165,25 +171,15 @@ private fun ProfileGroupedCard(
         ) {
           Box(
             modifier = Modifier
-              .size(42.dp)
+              .size(44.dp)
               .clip(CircleShape)
-              .background(
-                if (isActive) {
-                  MaterialTheme.colorScheme.primaryContainer
-                } else {
-                  MaterialTheme.colorScheme.surfaceContainerHighest
-                },
-              ),
+              .background(modeAccent.copy(alpha = 0.16f)),
             contentAlignment = Alignment.Center,
           ) {
             Icon(
               imageVector = profileIconForKey(profile.iconKey),
               contentDescription = null,
-              tint = if (isActive) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-              },
+              tint = modeAccent,
               modifier = Modifier.size(22.dp),
             )
           }
@@ -195,7 +191,7 @@ private fun ProfileGroupedCard(
             Text(
               text = profile.name,
               style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold,
+              fontWeight = FontWeight.Bold,
               color = MaterialTheme.colorScheme.onSurface,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
@@ -301,7 +297,7 @@ private fun ProfileGroupedCard(
           }
         }
 
-        // Linha 2: Badges responsivos em FlowRow (nunca esmagam nem quebram verticalmente em zoom aumentado)
+        // Linha 2: Badges Semânticos ZENITH
         FlowRow(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -310,11 +306,12 @@ private fun ProfileGroupedCard(
           Surface(
             shape = RoundedCornerShape(50),
             color = profile.mode.tonalContainerColor(),
+            border = BorderStroke(1.dp, modeAccent.copy(alpha = 0.30f)),
           ) {
             Text(
               text = profile.mode.title,
               style = MaterialTheme.typography.labelMedium,
-              fontWeight = FontWeight.Medium,
+              fontWeight = FontWeight.SemiBold,
               color = profile.mode.onTonalContainerColor(),
               maxLines = 1,
               softWrap = false,
@@ -325,13 +322,13 @@ private fun ProfileGroupedCard(
           if (isActive) {
             Surface(
               shape = RoundedCornerShape(50),
-              color = MaterialTheme.colorScheme.primary,
+              color = modeAccent,
             ) {
               Text(
                 text = AppLabels.Profiles.activeBadge,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = profile.mode.onActivePillColor(),
                 maxLines = 1,
                 softWrap = false,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -355,15 +352,6 @@ private fun ProfileGroupedCard(
             }
           }
         }
-
-        // Linha 3: Resumo completo dos 4 canais de volume (até 2 linhas em proporção aumentada)
-        Text(
-          text = AppLabels.Profiles.streamsSummaryLine(profile.streams),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-        )
       }
     }
   }

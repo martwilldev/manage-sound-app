@@ -553,73 +553,75 @@ class SoundModeGlanceWidget : GlanceAppWidget() {
 
   private fun rememberWidgetPalette(mode: SoundMode, isDark: Boolean): WidgetPalette {
     if (isDark) {
+      // Zenith — Noite Boreal (Dark Mode)
       val (bannerBg, bannerTitle, bannerSub, badgeBg, badgeContent, activeBtnBg) = when (mode) {
         SoundMode.NORMAL -> Sextuple(
-          Color(0xFF1B365D),
-          Color(0xFFEAF2FF),
-          Color(0xFFB8D1F8),
-          Color(0xFF284B7E),
-          Color(0xFFEAF2FF),
-          Color(0xFF4C8DF6),
+          Color(0xFF0E2926),
+          Color(0xFFF0F4FC),
+          Color(0xFF99F6E4),
+          Color(0xFF133A36),
+          Color(0xFF2DD4BF),
+          Color(0xFF2DD4BF),
         )
         SoundMode.VIBRATE -> Sextuple(
-          Color(0xFF392759),
-          Color(0xFFF5ECFF),
-          Color(0xFFD6BFF6),
-          Color(0xFF4E3778),
-          Color(0xFFF5ECFF),
-          Color(0xFF9B72CF),
+          Color(0xFF291D0A),
+          Color(0xFFF0F4FC),
+          Color(0xFFFDE68A),
+          Color(0xFF3B2A0F),
+          Color(0xFFFBBF24),
+          Color(0xFFFBBF24),
         )
         SoundMode.SILENT -> Sextuple(
-          Color(0xFF4F1E27),
-          Color(0xFFFFECEE),
-          Color(0xFFF8B8C0),
-          Color(0xFF6B2A36),
-          Color(0xFFFFECEE),
-          Color(0xFFE25C67),
+          Color(0xFF1D1536),
+          Color(0xFFF0F4FC),
+          Color(0xFFDDD6FE),
+          Color(0xFF2B1F4F),
+          Color(0xFFA78BFA),
+          Color(0xFFA78BFA),
         )
       }
       return WidgetPalette(
-        outerSurface = ColorProvider(Color(0xFF131820)),
+        outerSurface = ColorProvider(Color(0xFF070A10)),
         bannerBg = ColorProvider(bannerBg),
         bannerTitle = ColorProvider(bannerTitle),
         bannerSubtitle = ColorProvider(bannerSub),
         badgeBg = ColorProvider(badgeBg),
         badgeContent = ColorProvider(badgeContent),
         activeButtonBg = ColorProvider(activeBtnBg),
-        activeButtonContent = ColorProvider(Color(0xFF0B1118)),
-        inactiveButtonBg = ColorProvider(Color(0xFF1F2733)),
-        inactiveButtonContent = ColorProvider(Color(0xFFC5CFDC)),
+        activeButtonContent = ColorProvider(Color(0xFF061614)),
+        inactiveButtonBg = ColorProvider(Color(0xFF101624)),
+        inactiveButtonContent = ColorProvider(Color(0xFF8B9BB8)),
       )
     } else {
+      // Zenith — Alvorada Nórdica (Light Mode)
       val (bannerBg, bannerTitle, bannerSub, badgeBg, badgeContent, activeBtnBg) = when (mode) {
         SoundMode.NORMAL -> Sextuple(
-          Color(0xFFD7E6FF),
-          Color(0xFF0E294B),
-          Color(0xFF2E4D75),
+          Color(0xFFCCFBF1),
+          Color(0xFF0B1C1A),
+          Color(0xFF115E59),
           Color(0xFFFFFFFF),
-          Color(0xFF16437E),
-          Color(0xFF1E5AA8),
+          Color(0xFF0F766E),
+          Color(0xFF0F766E),
         )
         SoundMode.VIBRATE -> Sextuple(
-          Color(0xFFECDCFF),
-          Color(0xFF2C1649),
-          Color(0xFF513873),
+          Color(0xFFFEF3C7),
+          Color(0xFF241504),
+          Color(0xFF92400E),
           Color(0xFFFFFFFF),
-          Color(0xFF4D2C7A),
-          Color(0xFF653E9C),
+          Color(0xFFB45309),
+          Color(0xFFB45309),
         )
         SoundMode.SILENT -> Sextuple(
-          Color(0xFFFFDAD9),
-          Color(0xFF410E14),
-          Color(0xFF702931),
+          Color(0xFFEDE9FE),
+          Color(0xFF1E1038),
+          Color(0xFF5B21B6),
           Color(0xFFFFFFFF),
-          Color(0xFF8C1D28),
-          Color(0xFFB32634),
+          Color(0xFF6D28D9),
+          Color(0xFF6D28D9),
         )
       }
       return WidgetPalette(
-        outerSurface = ColorProvider(Color(0xFFF2F5FA)),
+        outerSurface = ColorProvider(Color(0xFFF6F5F0)),
         bannerBg = ColorProvider(bannerBg),
         bannerTitle = ColorProvider(bannerTitle),
         bannerSubtitle = ColorProvider(bannerSub),
@@ -627,8 +629,8 @@ class SoundModeGlanceWidget : GlanceAppWidget() {
         badgeContent = ColorProvider(badgeContent),
         activeButtonBg = ColorProvider(activeBtnBg),
         activeButtonContent = ColorProvider(Color(0xFFFFFFFF)),
-        inactiveButtonBg = ColorProvider(Color(0xFFE2E7F0)),
-        inactiveButtonContent = ColorProvider(Color(0xFF394352)),
+        inactiveButtonBg = ColorProvider(Color(0xFFEAE6DF)),
+        inactiveButtonContent = ColorProvider(Color(0xFF475569)),
       )
     }
   }

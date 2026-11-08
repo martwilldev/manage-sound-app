@@ -147,7 +147,7 @@ object SmartNotificationManager {
       )
       .build()
 
-    manager.notify(NOTIFICATION_ID_PERSISTENT_BAR, notification)
+    postNotificationSafely(context, NOTIFICATION_ID_PERSISTENT_BAR, notification)
   }
 
   fun showSmartRestorePrompt(
@@ -191,7 +191,7 @@ object SmartNotificationManager {
       )
       .build()
 
-    NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_SMART_PROMPT, notification)
+    postNotificationSafely(context, NOTIFICATION_ID_SMART_PROMPT, notification)
   }
 
   fun syncActiveTimerNotification(
@@ -236,7 +236,7 @@ object SmartNotificationManager {
       )
       .build()
 
-    manager.notify(NOTIFICATION_ID_ACTIVE_TIMER, notification)
+    postNotificationSafely(context, NOTIFICATION_ID_ACTIVE_TIMER, notification)
   }
 
   fun showRuleOverrideAlert(
@@ -261,7 +261,19 @@ object SmartNotificationManager {
       )
       .build()
 
-    NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_RULE_OVERRIDE, notification)
+    postNotificationSafely(context, NOTIFICATION_ID_RULE_OVERRIDE, notification)
+  }
+
+  @android.annotation.SuppressLint("MissingPermission")
+  private fun postNotificationSafely(
+    context: Context,
+    notificationId: Int,
+    notification: android.app.Notification,
+  ) {
+    if (!canPostNotifications(context)) return
+    runCatching {
+      NotificationManagerCompat.from(context).notify(notificationId, notification)
+    }
   }
 
   fun dismissSmartPrompt(context: Context) {

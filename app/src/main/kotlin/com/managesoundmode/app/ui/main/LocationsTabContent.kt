@@ -3,6 +3,7 @@ package com.managesoundmode.app.ui.main
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -28,11 +29,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
@@ -87,9 +92,9 @@ import com.managesoundmode.app.ui.common.AppTestTags
 import com.managesoundmode.app.ui.components.GeofenceMapPickerCard
 import com.managesoundmode.app.ui.components.M3CheckSwitch
 import com.managesoundmode.app.ui.components.ProminentLocationDisclosureDialog
-import com.managesoundmode.app.ui.components.groupedCardShape
 import com.managesoundmode.app.ui.components.profileIconForKey
 import com.managesoundmode.app.ui.theme.onTonalContainerColor
+import com.managesoundmode.app.ui.theme.tonalAccentColor
 import com.managesoundmode.app.ui.theme.tonalContainerColor
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
@@ -161,17 +166,17 @@ internal fun LocationsTabContent(
     modifier = modifier
       .fillMaxSize()
       .testTag(AppTestTags.Locations.LIST),
-    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
-    verticalArrangement = Arrangement.spacedBy(3.dp),
+    contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 6.dp, bottom = 104.dp),
+    verticalArrangement = Arrangement.spacedBy(10.dp),
   ) {
-    // Card rápido de sincronização GPS no topo da aba Locais
+    // Card de Radar GPS no topo da aba Locais
     item {
       Card(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(bottom = 8.dp)
           .testTag(AppTestTags.Locations.SYNC_GPS_CARD),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = CardDefaults.cardColors(
           containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -179,7 +184,7 @@ internal fun LocationsTabContent(
         FlowRow(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -187,7 +192,7 @@ internal fun LocationsTabContent(
             Text(
               text = AppLabels.Locations.geofenceHeaderTitle,
               style = MaterialTheme.typography.titleSmall,
-              fontWeight = FontWeight.SemiBold,
+              fontWeight = FontWeight.Bold,
             )
             Text(
               text = AppLabels.Locations.geofenceHeaderSubtitle,
@@ -212,7 +217,7 @@ internal fun LocationsTabContent(
               }
             },
             enabled = !isSyncingGps,
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             modifier = Modifier.testTag(AppTestTags.Locations.VERIFY_GPS_BUTTON),
           ) {
@@ -236,6 +241,7 @@ internal fun LocationsTabContent(
                 AppLabels.Locations.verifyGpsButton
               },
               style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.Bold,
               maxLines = 1,
               softWrap = false,
             )
@@ -250,9 +256,9 @@ internal fun LocationsTabContent(
       Card(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(bottom = 8.dp)
           .testTag(AppTestTags.Locations.GEOFENCE_STATUS_CARD),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
         colors = CardDefaults.cardColors(
           containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -260,16 +266,33 @@ internal fun LocationsTabContent(
         FlowRow(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
           Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = AppLabels.Locations.geofenceStatusTitle,
-              style = MaterialTheme.typography.titleSmall,
-              fontWeight = FontWeight.SemiBold,
-            )
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(8.dp)
+                  .clip(CircleShape)
+                  .background(
+                    if (activeGeofenceCount > 0) {
+                      MaterialTheme.colorScheme.primary
+                    } else {
+                      MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                  ),
+              )
+              Text(
+                text = AppLabels.Locations.geofenceStatusTitle,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+              )
+            }
             Text(
               text = AppLabels.Locations.geofenceStatusSubtitle(activeGeofenceCount),
               style = MaterialTheme.typography.bodySmall,
@@ -279,7 +302,7 @@ internal fun LocationsTabContent(
 
           FilledTonalButton(
             onClick = onSyncBackgroundGeofencesNow,
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(16.dp),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             modifier = Modifier.testTag(AppTestTags.Locations.SYNC_GEOFENCES_BUTTON),
           ) {
@@ -292,6 +315,7 @@ internal fun LocationsTabContent(
             Text(
               text = AppLabels.Locations.syncGeofencesButton,
               style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.Bold,
               maxLines = 1,
               softWrap = false,
             )
@@ -303,14 +327,14 @@ internal fun LocationsTabContent(
     itemsIndexed(
       items = locationRules,
       key = { _, rule -> rule.id },
-    ) { index, rule ->
+    ) { _, rule ->
       val targetProfile = profiles.firstOrNull { it.id == rule.targetProfileId }
         ?: profiles.firstOrNull()
 
       LocationRuleCard(
         rule = rule,
         targetProfile = targetProfile,
-        shape = groupedCardShape(index = index, totalCount = locationRules.size),
+        shape = RoundedCornerShape(24.dp),
         onClick = { onEditRule(rule) },
         onToggleEnabled = { enabled -> onToggleRule(rule, enabled) },
         onTogglePresence = { onTogglePresence(rule.id, !rule.isCurrentlyInside) },
@@ -334,10 +358,16 @@ private fun LocationRuleCard(
   val haptics = LocalHapticFeedback.current
   var showContextMenu by remember { mutableStateOf(false) }
 
+  val modeAccent = targetProfile?.mode?.tonalAccentColor() ?: MaterialTheme.colorScheme.primary
   val containerColor = when {
-    rule.enabled && rule.isCurrentlyInside -> MaterialTheme.colorScheme.secondaryContainer
-    rule.enabled -> MaterialTheme.colorScheme.surfaceContainerHigh
-    else -> MaterialTheme.colorScheme.surfaceContainerLow
+    rule.enabled && rule.isCurrentlyInside -> MaterialTheme.colorScheme.surfaceContainerHigh
+    rule.enabled -> MaterialTheme.colorScheme.surfaceContainerLow
+    else -> MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.68f)
+  }
+  val borderStroke = when {
+    rule.enabled && rule.isCurrentlyInside -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+    rule.enabled -> BorderStroke(1.dp, modeAccent.copy(alpha = 0.35f))
+    else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
   }
 
   Card(
@@ -353,6 +383,7 @@ private fun LocationRuleCard(
       )
       .testTag(AppTestTags.Locations.card(rule.id)),
     shape = shape,
+    border = borderStroke,
     colors = CardDefaults.cardColors(containerColor = containerColor),
   ) {
     Column(
@@ -373,11 +404,11 @@ private fun LocationRuleCard(
         ) {
           Box(
             modifier = Modifier
-              .size(42.dp)
+              .size(44.dp)
               .clip(CircleShape)
               .background(
                 if (rule.enabled) {
-                  MaterialTheme.colorScheme.primaryContainer
+                  modeAccent.copy(alpha = 0.16f)
                 } else {
                   MaterialTheme.colorScheme.surfaceContainerHighest
                 },
@@ -388,7 +419,7 @@ private fun LocationRuleCard(
               imageVector = Icons.Default.LocationOn,
               contentDescription = null,
               tint = if (rule.enabled) {
-                MaterialTheme.colorScheme.onPrimaryContainer
+                modeAccent
               } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
               },
@@ -403,7 +434,7 @@ private fun LocationRuleCard(
             Text(
               text = rule.name,
               style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold,
+              fontWeight = FontWeight.Bold,
               maxLines = 2,
               overflow = TextOverflow.Ellipsis,
               color = if (rule.enabled) {
@@ -450,6 +481,7 @@ private fun LocationRuleCard(
                   Text(
                     text = rule.wifiSsid,
                     style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.primary,
@@ -573,7 +605,7 @@ private fun LocationRuleCard(
         }
       }
 
-      // Badges responsivos em FlowRow (sem esmagamento vertical em zoom aumentado)
+      // Badges Semânticos ZENITH
       FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -604,6 +636,11 @@ private fun LocationRuleCard(
             } else {
               MaterialTheme.colorScheme.surfaceContainerHighest
             },
+            border = if (rule.enabled) {
+              BorderStroke(1.dp, modeAccent.copy(alpha = 0.30f))
+            } else {
+              null
+            },
           ) {
             Row(
               modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -623,6 +660,7 @@ private fun LocationRuleCard(
               Text(
                 text = "${targetProfile.name} • ${targetProfile.summaryLabel()}",
                 style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 softWrap = false,
                 color = if (rule.enabled) {
@@ -644,6 +682,7 @@ private fun LocationRuleCard(
 internal fun LocationEditorBottomSheet(
   initialRule: LocationRule?,
   profiles: List<SoundProfile>,
+  knownWifiSsids: List<String> = emptyList(),
   onConfirm: (LocationRule) -> Unit,
   onAutoSave: (LocationRule) -> Unit = {},
   onTogglePresence: ((String, Boolean) -> Unit)? = null,
@@ -672,6 +711,42 @@ internal fun LocationEditorBottomSheet(
   var isFetchingGps by remember { mutableStateOf(false) }
   var isSearchingAddress by remember { mutableStateOf(false) }
   var searchResults by remember { mutableStateOf<List<AddressSearchResult>>(emptyList()) }
+  var showWifiDropdown by remember { mutableStateOf(false) }
+  var wifiSearchQuery by rememberSaveable { mutableStateOf("") }
+  var connectedWifiSsid by remember {
+    mutableStateOf(LocationProximityHelper.readConnectedWifiSsid(context))
+  }
+  var availableWifiSsids by remember(knownWifiSsids) {
+    mutableStateOf(
+      LocationProximityHelper.readKnownAndAvailableWifiSsids(
+        context = context,
+        savedRuleSsids = knownWifiSsids,
+      ),
+    )
+  }
+
+  val filteredWifiSsids = remember(availableWifiSsids, wifiSearchQuery, wifiSsid) {
+    val base = buildList {
+      if (wifiSsid.isNotBlank() && availableWifiSsids.none { it.equals(wifiSsid, ignoreCase = true) }) {
+        add(wifiSsid.trim())
+      }
+      addAll(availableWifiSsids)
+    }
+    val q = wifiSearchQuery.trim()
+    if (q.isEmpty()) {
+      base
+    } else {
+      base.filter { it.contains(q, ignoreCase = true) }
+    }
+  }
+
+  fun refreshWifiList() {
+    connectedWifiSsid = LocationProximityHelper.readConnectedWifiSsid(context)
+    availableWifiSsids = LocationProximityHelper.readKnownAndAvailableWifiSsids(
+      context = context,
+      savedRuleSsids = knownWifiSsids,
+    )
+  }
 
   fun buildRule(): LocationRule {
     val resolvedName = name.trim().ifEmpty {
@@ -716,6 +791,7 @@ internal fun LocationEditorBottomSheet(
     val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
       permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
     if (granted) {
+      refreshWifiList()
       fetchAndApplyDeviceGps()
     }
   }
@@ -758,7 +834,7 @@ internal fun LocationEditorBottomSheet(
                   AppLabels.Locations.newLocationTitle
                 },
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
               )
@@ -814,13 +890,13 @@ internal fun LocationEditorBottomSheet(
           },
           label = { Text(AppLabels.Locations.locationNameLabel) },
           singleLine = true,
-          shape = RoundedCornerShape(16.dp),
+          shape = RoundedCornerShape(18.dp),
           modifier = Modifier
             .fillMaxWidth()
             .testTag(AppTestTags.Locations.NAME_INPUT),
         )
 
-        // Mapa Interativo OpenStreetMap + Busca de Endereço + Botão GPS Atual
+        // Mapa Interativo OpenStreetMap + Radar Topográfico ZENITH
         GeofenceMapPickerCard(
           latitude = latitude,
           longitude = longitude,
@@ -865,66 +941,302 @@ internal fun LocationEditorBottomSheet(
           },
         )
 
-        // Controle do Raio do Perímetro (Geofence) sincronizado com o círculo no mapa
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        // Controle do Raio do Perímetro (Geofence)
+        Surface(
+          shape = RoundedCornerShape(22.dp),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
           ) {
-            Text(
-              text = AppLabels.Locations.radiusSectionTitle,
-              style = MaterialTheme.typography.titleSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-              text = AppLabels.Locations.metersValue(radius.roundToInt()),
-              style = MaterialTheme.typography.labelLarge,
-              fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.primary,
-            )
-          }
-          Slider(
-            value = radius,
-            onValueChange = { radius = it },
-            onValueChangeFinished = { notifyAutoSaveIfEditing() },
-            valueRange = 100f..1000f,
-            modifier = Modifier.testTag(AppTestTags.Locations.RADIUS_SLIDER),
-          )
-          FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-          ) {
-            listOf(100, 150, 250, 500, 1000).forEach { presetMeters ->
-              FilterChip(
-                selected = radius.roundToInt() == presetMeters,
-                onClick = {
-                  radius = presetMeters.toFloat()
-                  notifyAutoSaveIfEditing()
-                },
-                label = {
-                  Text(
-                    text = "${presetMeters}m",
-                    maxLines = 1,
-                    softWrap = false,
-                  )
-                },
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Text(
+                text = AppLabels.Locations.radiusSectionTitle,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
+              Text(
+                text = AppLabels.Locations.metersValue(radius.roundToInt()),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+              )
+            }
+            Slider(
+              value = radius,
+              onValueChange = { radius = it },
+              onValueChangeFinished = { notifyAutoSaveIfEditing() },
+              valueRange = 100f..1000f,
+              modifier = Modifier.testTag(AppTestTags.Locations.RADIUS_SLIDER),
+            )
+            FlowRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+              listOf(100, 150, 250, 500, 1000).forEach { presetMeters ->
+                FilterChip(
+                  selected = radius.roundToInt() == presetMeters,
+                  onClick = {
+                    radius = presetMeters.toFloat()
+                    notifyAutoSaveIfEditing()
+                  },
+                  label = {
+                    Text(
+                      text = "${presetMeters}m",
+                      maxLines = 1,
+                      softWrap = false,
+                    )
+                  },
+                )
+              }
             }
           }
         }
 
-        OutlinedTextField(
-          value = wifiSsid,
-          onValueChange = {
-            wifiSsid = it
-            notifyAutoSaveIfEditing()
-          },
-          label = { Text(AppLabels.Locations.wifiSsidLabel) },
-          singleLine = true,
-          shape = RoundedCornerShape(16.dp),
-          modifier = Modifier.fillMaxWidth(),
-        )
+        // Seletor de Rede Wi-Fi Conhecida / Pareada (Confirmação Indoor)
+        Surface(
+          shape = RoundedCornerShape(22.dp),
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+          ) {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f),
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Wifi,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(18.dp),
+                )
+                Text(
+                  text = AppLabels.Locations.wifiSsidLabel,
+                  style = MaterialTheme.typography.titleSmall,
+                  fontWeight = FontWeight.SemiBold,
+                  color = MaterialTheme.colorScheme.onSurface,
+                )
+              }
+
+              IconButton(
+                onClick = {
+                  if (LocationProximityHelper.hasLocationPermission(context)) {
+                    refreshWifiList()
+                  } else {
+                    gpsPermissionLauncher.launch(
+                      arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                      ),
+                    )
+                  }
+                },
+                modifier = Modifier.size(32.dp),
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Refresh,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(18.dp),
+                )
+              }
+            }
+
+            // Campo de Busca de Rede Wi-Fi Conhecida / Pareada + Menu Dropdown
+            Box(modifier = Modifier.fillMaxWidth()) {
+              OutlinedTextField(
+                value = wifiSearchQuery,
+                onValueChange = { wifiSearchQuery = it },
+                placeholder = {
+                  Text(
+                    if (wifiSsid.isNotBlank()) {
+                      "Selecionada: $wifiSsid (digite para buscar outra)"
+                    } else {
+                      "Buscar rede Wi-Fi conhecida..."
+                    },
+                  )
+                },
+                leadingIcon = {
+                  Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                  )
+                },
+                trailingIcon = {
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (wifiSearchQuery.isNotBlank() || wifiSsid.isNotBlank()) {
+                      IconButton(
+                        onClick = {
+                          if (wifiSearchQuery.isNotBlank()) {
+                            wifiSearchQuery = ""
+                          } else {
+                            wifiSsid = ""
+                            notifyAutoSaveIfEditing()
+                          }
+                        },
+                      ) {
+                        Icon(
+                          imageVector = Icons.Default.Close,
+                          contentDescription = null,
+                          modifier = Modifier.size(18.dp),
+                        )
+                      }
+                    }
+                    IconButton(onClick = { showWifiDropdown = !showWifiDropdown }) {
+                      Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                      )
+                    }
+                  }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+              )
+
+              DropdownMenu(
+                expanded = showWifiDropdown,
+                onDismissRequest = { showWifiDropdown = false },
+              ) {
+                DropdownMenuItem(
+                  text = { Text("Nenhuma (Usar apenas GPS)") },
+                  onClick = {
+                    wifiSsid = ""
+                    wifiSearchQuery = ""
+                    showWifiDropdown = false
+                    notifyAutoSaveIfEditing()
+                  },
+                )
+                HorizontalDivider()
+                filteredWifiSsids.forEach { candidateSsid ->
+                  val isCurrentConnected = connectedWifiSsid != null &&
+                    connectedWifiSsid.equals(candidateSsid, ignoreCase = true)
+                  DropdownMenuItem(
+                    text = {
+                      Text(
+                        text = if (isCurrentConnected) {
+                          "$candidateSsid (Conectada agora)"
+                        } else {
+                          candidateSsid
+                        },
+                        fontWeight = if (wifiSsid.equals(candidateSsid, ignoreCase = true)) {
+                          FontWeight.Bold
+                        } else {
+                          FontWeight.Normal
+                        },
+                      )
+                    },
+                    leadingIcon = {
+                      Icon(
+                        imageVector = Icons.Default.Wifi,
+                        contentDescription = null,
+                        tint = if (isCurrentConnected) {
+                          MaterialTheme.colorScheme.primary
+                        } else {
+                          MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                      )
+                    },
+                    onClick = {
+                      wifiSsid = candidateSsid
+                      wifiSearchQuery = ""
+                      showWifiDropdown = false
+                      notifyAutoSaveIfEditing()
+                    },
+                  )
+                }
+              }
+            }
+
+            // Chips rápidos das redes conhecidas / pareadas / filtradas pela busca
+            FlowRow(
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+              val trimmedQuery = wifiSearchQuery.trim()
+              if (
+                trimmedQuery.isNotEmpty() &&
+                availableWifiSsids.none { it.equals(trimmedQuery, ignoreCase = true) }
+              ) {
+                FilterChip(
+                  selected = wifiSsid.equals(trimmedQuery, ignoreCase = true),
+                  onClick = {
+                    wifiSsid = trimmedQuery
+                    wifiSearchQuery = ""
+                    notifyAutoSaveIfEditing()
+                  },
+                  leadingIcon = {
+                    Icon(
+                      imageVector = Icons.Default.Wifi,
+                      contentDescription = null,
+                      modifier = Modifier.size(15.dp),
+                    )
+                  },
+                  label = {
+                    Text(
+                      text = "Usar \"$trimmedQuery\"",
+                      maxLines = 1,
+                      softWrap = false,
+                    )
+                  },
+                )
+              }
+
+              filteredWifiSsids.forEach { candidateSsid ->
+                val selected = wifiSsid.trim().equals(candidateSsid, ignoreCase = true)
+                val isCurrentConnected = connectedWifiSsid != null &&
+                  connectedWifiSsid.equals(candidateSsid, ignoreCase = true)
+                FilterChip(
+                  selected = selected,
+                  onClick = {
+                    wifiSsid = if (selected) "" else candidateSsid
+                    wifiSearchQuery = ""
+                    notifyAutoSaveIfEditing()
+                  },
+                  leadingIcon = {
+                    Icon(
+                      imageVector = if (selected) Icons.Default.Check else Icons.Default.Wifi,
+                      contentDescription = null,
+                      modifier = Modifier.size(15.dp),
+                    )
+                  },
+                  label = {
+                    Text(
+                      text = if (isCurrentConnected) {
+                        "$candidateSsid • Conectada"
+                      } else {
+                        candidateSsid
+                      },
+                      maxLines = 1,
+                      softWrap = false,
+                    )
+                  },
+                )
+              }
+            }
+          }
+        }
 
         Text(
           text = AppLabels.Locations.targetProfileSectionTitle,
@@ -955,12 +1267,13 @@ internal fun LocationEditorBottomSheet(
         }
 
         if (initialRule != null && onTogglePresence != null) {
-          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
           OutlinedButton(
             onClick = {
               onTogglePresence(initialRule.id, !initialRule.isCurrentlyInside)
               onDismiss()
             },
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier
               .fillMaxWidth()
               .testTag(AppTestTags.Locations.togglePresenceButton(initialRule.id)),
@@ -977,6 +1290,7 @@ internal fun LocationEditorBottomSheet(
               } else {
                 AppLabels.Locations.testPresenceButton
               },
+              fontWeight = FontWeight.SemiBold,
             )
           }
         }
@@ -984,11 +1298,12 @@ internal fun LocationEditorBottomSheet(
         if (!isEditing) {
           Button(
             onClick = { onConfirm(buildRule()) },
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier
               .fillMaxWidth()
               .height(52.dp),
           ) {
-            Text(AppLabels.Locations.createLocationButton)
+            Text(AppLabels.Locations.createLocationButton, fontWeight = FontWeight.Bold)
           }
         }
       }

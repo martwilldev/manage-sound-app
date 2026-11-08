@@ -9,10 +9,10 @@ import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -75,6 +76,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.managesoundmode.app.system.AddressSearchResult
 import com.managesoundmode.app.ui.common.AppLabels
 import com.managesoundmode.app.ui.common.AppTestTags
+import com.managesoundmode.app.ui.theme.LocalZenithIsDark
 import java.util.Locale
 
 private class OsmWebMapBridge(
@@ -95,12 +97,7 @@ private class OsmWebMapBridge(
 }
 
 /**
- * Cartão completo de Mapa Interativo OpenStreetMap (100% gratuito, sem necessidade de API Key):
- * - Busca de endereço integrada (Nominatim OSM + Android Geocoder)
- * - Botão "Usar minha localização atual (GPS)"
- * - Mapa Leaflet + OpenStreetMap / CartoDB com pino arrastável e toque para posicionar
- * - Círculo geodésico real em metros que cresce/diminui conforme o slider de raio da cerca
- * - Fallback visual em Canvas Topográfico se o aparelho estiver sem internet
+ * Cartão completo de Mapa Interativo OpenStreetMap com Radar Topográfico ZENITH.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
@@ -119,7 +116,7 @@ fun GeofenceMapPickerCard(
   modifier: Modifier = Modifier,
 ) {
   val focusManager = LocalFocusManager.current
-  val isDark = isSystemInDarkTheme()
+  val isDark = LocalZenithIsDark.current
   var searchQuery by rememberSaveable { mutableStateOf("") }
   var webMapReady by remember { mutableStateOf(false) }
   var webViewRef by remember { mutableStateOf<WebView?>(null) }
@@ -160,6 +157,7 @@ fun GeofenceMapPickerCard(
       .fillMaxWidth()
       .testTag(AppTestTags.GeofenceMap.CARD),
     shape = RoundedCornerShape(24.dp),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ),
@@ -180,7 +178,7 @@ fun GeofenceMapPickerCard(
           Text(
             text = AppLabels.GeofenceMap.mapCardTitle,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
           )
           Text(
             text = AppLabels.GeofenceMap.mapCardSubtitle,
@@ -216,6 +214,7 @@ fun GeofenceMapPickerCard(
               AppLabels.GeofenceMap.useCurrentGpsLabel
             },
             style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
             softWrap = false,
           )
@@ -327,15 +326,14 @@ fun GeofenceMapPickerCard(
         }
       }
 
-      // Container do Mapa Interativo (OpenStreetMap + Radar Topográfico Fallback)
+      // Container do Mapa Interativo (OpenStreetMap + Radar Topográfico ZENITH)
       Box(
         modifier = Modifier
           .fillMaxWidth()
           .height(265.dp)
-          .clip(RoundedCornerShape(20.dp))
+          .clip(RoundedCornerShape(22.dp))
           .background(MaterialTheme.colorScheme.surfaceContainerHighest),
       ) {
-        // Camada base radar (visível instantaneamente enquanto os blocos OSM carregam ou offline)
         OfflineRadarGeofenceCanvas(
           latitude = latitude,
           longitude = longitude,
@@ -348,7 +346,6 @@ fun GeofenceMapPickerCard(
           modifier = Modifier.fillMaxSize(),
         )
 
-        // Mapa OpenStreetMap Interativo (Leaflet)
         AndroidView(
           modifier = Modifier
             .fillMaxSize()
@@ -380,7 +377,6 @@ fun GeofenceMapPickerCard(
                 ),
                 "AndroidMapBridge",
               )
-              // Impede que o ScrollView pai roube o gesto de arrastar o mapa
               setOnTouchListener { v, event ->
                 when (event.actionMasked) {
                   MotionEvent.ACTION_DOWN,
@@ -479,6 +475,7 @@ fun GeofenceMapPickerCard(
         Surface(
           shape = RoundedCornerShape(50),
           color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.92f),
+          border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
           tonalElevation = 4.dp,
           modifier = Modifier
             .align(Alignment.BottomStart)
@@ -502,7 +499,7 @@ fun GeofenceMapPickerCard(
                 radiusMeters,
               ),
               style = MaterialTheme.typography.labelMedium,
-              fontWeight = FontWeight.SemiBold,
+              fontWeight = FontWeight.Bold,
               maxLines = 1,
               softWrap = false,
             )
@@ -561,8 +558,16 @@ private fun OfflineRadarGeofenceCanvas(
     val circleRadiusPx = (size.minDimension * 0.18f) + (size.minDimension * 0.26f * normalizedRadius)
 
     drawCircle(
-      color = primaryColor.copy(alpha = 0.18f),
-      radius = circleRadiusPx,
+      brush = Brush.radialGradient(
+        colors = listOf(
+          primaryColor.copy(alpha = 0.28f),
+          primaryColor.copy(alpha = 0.06f),
+          Color.Transparent,
+        ),
+        center = center,
+        radius = circleRadiusPx * 1.25f,
+      ),
+      radius = circleRadiusPx * 1.25f,
       center = center,
     )
     drawCircle(
@@ -598,6 +603,10 @@ private fun buildLeafletMapHtml(
   } else {
     "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
   }
+  val pinHex = if (isDark) "#2DD4BF" else "#0F766E"
+  val circleStrokeHex = if (isDark) "#2DD4BF" else "#0F766E"
+  val circleFillHex = if (isDark) "#14B8A6" else "#2DD4BF"
+
   return """
     <!DOCTYPE html>
     <html>
@@ -623,9 +632,9 @@ private fun buildLeafletMapHtml(
           width: 22px;
           height: 22px;
           border-radius: 50%;
-          background: #2563EB;
+          background: $pinHex;
           border: 3px solid #FFFFFF;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+          box-shadow: 0 2px 10px rgba(20,184,166,0.55);
         }
       </style>
     </head>
@@ -673,10 +682,10 @@ private fun buildLeafletMapHtml(
           });
 
           circle = L.circle([currentLat, currentLng], {
-            color: '#3B82F6',
+            color: '$circleStrokeHex',
             weight: 2.5,
-            fillColor: '#60A5FA',
-            fillOpacity: 0.24,
+            fillColor: '$circleFillHex',
+            fillOpacity: 0.22,
             radius: currentRadius
           }).addTo(map);
 

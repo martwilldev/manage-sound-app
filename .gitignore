@@ -20,3 +20,5 @@ keystore.properties
 *.idsig
 *.jks
 *.keystore
+/dist
+*service-account*.json

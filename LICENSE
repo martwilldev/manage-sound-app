@@ -1,0 +1,26 @@
+Copyright (c) 2026 Matheus Maia (@martwilldev). All Rights Reserved.
+
+PORTFOLIO & SOURCE-AVAILABLE LICENSE
+====================================
+
+This repository is published publicly for portfolio demonstration, architectural
+review, and educational inspection.
+
+1. Permitted Uses (Read & Evaluate):
+   - You may view, clone, and inspect the source code and documentation for
+     technical evaluation, code review, and educational reference.
+   - You may compile and run the application locally on an emulator or personal
+     device strictly for non-commercial testing and evaluation.
+
+2. Prohibited Uses (No Commercial Redistribution or Store Cloning):
+   - You may NOT publish, distribute, sublicense, or sell this application, or
+     any derivative work based on it, on the Google Play Store, Apple App Store,
+     F-Droid, or any third-party APK/AAB distribution platform.
+   - You may NOT use the product name ("Modos de Som" / "Manage Sound Mode"),
+     package identifier ("com.managesoundmode.app"), adaptive icons, or Zenith
+     visual identity in any distributed product without prior written permission
+     from the copyright holder.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.

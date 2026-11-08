@@ -1,0 +1,4 @@
+• New Zenith UI with status Orb and instant switching between Sound, Vibrate, and Silent.
+• Auto-restore timer (15m, 30m, 1h, 2h) with automatic fallback to your default profile.
+• Smart known Wi-Fi network picker and real-time search filter in Locations (Geofence).
+• Android 16 (API 36) support, Night/Dawn themes, and stability improvements.

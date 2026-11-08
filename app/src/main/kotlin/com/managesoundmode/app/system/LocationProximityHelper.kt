@@ -68,6 +68,60 @@ object LocationProximityHelper {
       }
     }.getOrNull()
 
+  /**
+   * Retorna a lista de redes Wi-Fi conhecidas, pareadas, salvas em regras ou detectadas
+   * ao redor do aparelho (ordenadas com a rede conectada no topo).
+   */
+  @SuppressLint("MissingPermission")
+  fun readKnownAndAvailableWifiSsids(
+    context: Context,
+    savedRuleSsids: List<String> = emptyList(),
+  ): List<String> {
+    val result = linkedSetOf<String>()
+
+    fun addClean(raw: String?) {
+      val cleaned = raw?.trim()?.removeSurrounding("\"") ?: return
+      if (cleaned.isNotBlank() && !cleaned.equals("<unknown ssid>", ignoreCase = true)) {
+        result.add(cleaned)
+      }
+    }
+
+    // 1. Rede Wi-Fi conectada neste instante
+    addClean(readConnectedWifiSsid(context))
+
+    val wifiManager =
+      context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+
+    // 2. Redes Wi-Fi pareadas/configuradas no sistema (quando disponível na API/OEM)
+    if (wifiManager != null && hasLocationPermission(context)) {
+      runCatching {
+        @Suppress("DEPRECATION")
+        wifiManager.configuredNetworks?.forEach { config ->
+          addClean(config.SSID)
+        }
+      }
+
+      // 3. Redes Wi-Fi detectadas no último scan do sistema (ordenadas por intensidade de sinal)
+      runCatching {
+        wifiManager.scanResults
+          .orEmpty()
+          .sortedByDescending { it.level }
+          .forEach { scanResult ->
+            @Suppress("DEPRECATION")
+            addClean(scanResult.SSID)
+          }
+      }
+    }
+
+    // 4. Redes Wi-Fi já cadastradas nos locais salvos do usuário
+    savedRuleSsids.forEach { addClean(it) }
+
+    // 5. Redes padrão conhecidas (incluindo AndroidWifi em emuladores e presets)
+    listOf("AndroidWifi", "Escritorio_5G", "Campus_WiFi", "Casa_5G").forEach { addClean(it) }
+
+    return result.toList()
+  }
+
   fun matchesWifiSsid(ruleWifiSsid: String?, connectedWifiSsid: String?): Boolean {
     val target = ruleWifiSsid?.trim()?.removeSurrounding("\"")?.takeIf { it.isNotEmpty() } ?: return false
     val current = connectedWifiSsid?.trim()?.removeSurrounding("\"")?.takeIf { it.isNotEmpty() } ?: return false

@@ -1,43 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Cápsula acústica translúcida na safe-zone central (66dp) -->
+    <!-- =================================================================
+         TRILHOS DE VIDRO DAS 3 CÁPSULAS FLUTUANTES (Safe-Zone 66dp)
+         ================================================================= -->
+    <!-- Trilho Esquerdo (x=26..40, y=27..81, r=7) -->
     <path
-        android:fillColor="#1FFFFFFF"
-        android:pathData="M54,25C70.016,25 83,37.984 83,54C83,70.016 70.016,83 54,83C37.984,83 25,70.016 25,54C25,37.984 37.984,25 54,25Z" />
+        android:fillColor="#FF18243A"
+        android:pathData="M33,27C36.866,27 40,30.134 40,34V74C40,77.866 36.866,81 33,81C29.134,81 26,77.866 26,74V34C26,30.134 29.134,27 33,27Z"
+        android:strokeWidth="1.0"
+        android:strokeColor="#22FFFFFF" />
 
-    <!-- Sombra suave sob o ícone principal -->
+    <!-- Trilho Central (x=47..61, y=23..85, r=7) -->
     <path
-        android:fillColor="#26000000"
-        android:pathData="M34,48.5C34,46.843 35.343,45.5 37,45.5H42.6L52.2,37.4C53.8,36.05 56.25,37.19 56.25,39.28V69.72C56.25,71.81 53.8,72.95 52.2,71.6L42.6,63.5H37C35.343,63.5 34,62.157 34,60.5V48.5Z" />
+        android:fillColor="#FF18243A"
+        android:pathData="M54,23C57.866,23 61,26.134 61,30V78C61,81.866 57.866,85 54,85C50.134,85 47,81.866 47,78V30C47,26.134 50.134,23 54,23Z"
+        android:strokeWidth="1.0"
+        android:strokeColor="#22FFFFFF" />
 
-    <!-- Cone do Alto-Falante Principal (Branco Puro) -->
+    <!-- Trilho Direito (x=68..82, y=27..81, r=7) -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M34,47C34,45.343 35.343,44 37,44H42.6L52.2,35.9C53.8,34.55 56.25,35.69 56.25,37.78V68.22C56.25,70.31 53.8,71.45 52.2,70.1L42.6,62H37C35.343,62 34,60.657 34,59V47Z" />
+        android:fillColor="#FF18243A"
+        android:pathData="M75,27C78.866,27 82,30.134 82,34V74C82,77.866 78.866,81 75,81C71.134,81 68,77.866 68,74V34C68,30.134 71.134,27 75,27Z"
+        android:strokeWidth="1.0"
+        android:strokeColor="#22FFFFFF" />
 
-    <!-- Onda Sonora Interna (Ativa / Brilhante) -->
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M62.5,44.5C65.8,47.0 67.8,50.3 67.8,53C67.8,55.7 65.8,59.0 62.5,61.5"
-        android:strokeWidth="4.2"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
+    <!-- =================================================================
+         PREENCHIMENTO LÍQUIDO DAS 3 CÁPSULAS (Violet • Teal • Amber)
+         ================================================================= -->
+    <!-- Cápsula Esquerda: Serene Violet (y=44..81) -->
+    <path android:pathData="M33,44C36.866,44 40,47.134 40,51V74C40,77.866 36.866,81 33,81C29.134,81 26,77.866 26,74V51C26,47.134 29.134,44 33,44Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="33"
+                android:startY="81"
+                android:endX="33"
+                android:endY="44"
+                android:type="linear">
+                <item
+                    android:color="#5B21B6"
+                    android:offset="0.0" />
+                <item
+                    android:color="#A78BFA"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Onda Sonora Externa (Ciano Acústico Suave) -->
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M68.2,38.5C73.6,42.5 76.8,47.5 76.8,53C76.8,58.5 73.6,63.5 68.2,67.5"
-        android:strokeWidth="4.0"
-        android:strokeColor="#93C5FD"
-        android:strokeLineCap="round" />
+    <!-- Cápsula Central: Boreal Teal (y=29..85) -->
+    <path android:pathData="M54,29C57.866,29 61,32.134 61,36V78C61,81.866 57.866,85 54,85C50.134,85 47,81.866 47,78V36C47,32.134 50.134,29 54,29Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="85"
+                android:endX="54"
+                android:endY="29"
+                android:type="linear">
+                <item
+                    android:color="#0F766E"
+                    android:offset="0.0" />
+                <item
+                    android:color="#2DD4BF"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- Ponto de Pulso Inteligente (Representa Rotina/Horário/Local ativo) -->
+    <!-- Cápsula Direita: Solar Amber (y=52..81) -->
+    <path android:pathData="M75,52C78.866,52 82,55.134 82,59V74C82,77.866 78.866,81 75,81C71.134,81 68,77.866 68,74V59C68,55.134 71.134,52 75,52Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="75"
+                android:startY="81"
+                android:endX="75"
+                android:endY="52"
+                android:type="linear">
+                <item
+                    android:color="#B45309"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FBBF24"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- =================================================================
+         INDICADORES LUMINOSOS NAS CÁPSULAS
+         ================================================================= -->
     <path
-        android:fillColor="#38BDF8"
-        android:pathData="M63.5,35.5m-3.2,0a3.2,3.2 0,1 1,6.4 0a3.2,3.2 0,1 1,-6.4 0" />
+        android:fillColor="#A78BFA"
+        android:pathData="M33,35.5m-2.3,0a2.3,2.3 0,1 1,4.6 0a2.3,2.3 0,1 1,-4.6 0" />
+    <path
+        android:fillColor="#070A10"
+        android:pathData="M54,36.5m-2.7,0a2.7,2.7 0,1 1,5.4 0a2.7,2.7 0,1 1,-5.4 0" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M75,39.5m-2.3,0a2.3,2.3 0,1 1,4.6 0a2.3,2.3 0,1 1,-4.6 0" />
 </vector>
