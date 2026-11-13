@@ -17,8 +17,8 @@ WORKSPACE_STORE_DIR="$(cd "$REPO_DIR/../.." 2>/dev/null && pwd)/docs/store"
 
 cd "$REPO_DIR"
 
-# Carrega automaticamente o arquivo .env se existir
-if [[ -f "$REPO_DIR/.env" ]]; then
+# Carrega automaticamente o arquivo .env (físico ou FIFO virtual do 1Password) se existir
+if [[ -e "$REPO_DIR/.env" || -p "$REPO_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
   source "$REPO_DIR/.env"

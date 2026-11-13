@@ -38,8 +38,8 @@ else
   echo "   ./scripts/setup-cicd-secrets.sh ~/Downloads/nome-do-arquivo.json"
 fi
 
-# Garante que o .env existe e está preenchido
-if [[ ! -f "$REPO_DIR/.env" ]]; then
+# Garante que o .env (físico ou FIFO virtual do 1Password) existe
+if [[ ! -e "$REPO_DIR/.env" && ! -p "$REPO_DIR/.env" ]]; then
   cp "$REPO_DIR/.env.example" "$REPO_DIR/.env"
 fi
 
